@@ -1,9 +1,13 @@
+mod config;
 mod is_client;
 mod server;
 
+use config::AppConfig;
 use is_client::ISClient;
 use rmcp::{ServiceExt, transport::stdio};
 use server::WmServer;
+use std::collections::HashMap;
+use std::sync::Arc;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -17,18 +21,24 @@ async fn main() -> anyhow::Result<()> {
         .with_ansi(false)
         .init();
 
-    let base_url = std::env::var("WM_IS_URL").unwrap_or_else(|_| "http://localhost:5555".into());
-    let username = std::env::var("WM_IS_USER").unwrap_or_else(|_| "Administrator".into());
-    let password = std::env::var("WM_IS_PASSWORD").unwrap_or_else(|_| "manage".into());
-    let timeout: u64 = std::env::var("WM_IS_TIMEOUT")
-        .ok()
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(30);
+    let config = AppConfig::load().map_err(|e| anyhow::anyhow!(e))?;
 
-    tracing::info!("Starting webMethods IS MCP server (target: {})", base_url);
+    let mut clients = HashMap::new();
+    for (name, inst) in &config.instances {
+        tracing::info!("Registering IS instance '{}' at {}", name, inst.url);
+        let client = ISClient::new(&inst.url, &inst.user, &inst.password, inst.timeout);
+        clients.insert(name.clone(), Arc::new(client));
+    }
 
-    let client = ISClient::new(&base_url, &username, &password, timeout);
-    let service = WmServer::new(client).serve(stdio()).await?;
+    tracing::info!(
+        "Starting webMethods IS MCP server ({} instance(s), default: '{}')",
+        clients.len(),
+        config.default_instance,
+    );
+
+    let service = WmServer::new(clients, config.default_instance)
+        .serve(stdio())
+        .await?;
     service.waiting().await?;
 
     Ok(())

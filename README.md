@@ -18,9 +18,10 @@ Compatible with any [MCP client](https://modelcontextprotocol.io/) (IBM Bob, Cla
 | **OPC UA adapters** | Create OPC connections, subscription listeners |
 | **Server admin** | Check status, shutdown, restart |
 
-### 39 tools across 7 categories
+### 40 tools across 8 categories
 
 ```
+Instances       list_instances
 Server          is_status, is_shutdown
 Packages        package_list, package_create, package_reload, package_enable, package_disable
 Namespace       node_list, node_get, node_delete, folder_create
@@ -33,6 +34,8 @@ Adapters        adapter_type_list, adapter_connection_metadata, adapter_connecti
                 adapter_notification_list, adapter_notification_create_polling,
                 adapter_notification_create_listener_based
 ```
+
+Supports **multiple IS instances** -- configure via a JSON file and pass `instance` to any tool to target a specific server.
 
 ## Quick Start
 
@@ -76,7 +79,20 @@ Create `.mcp.json` in your project directory:
 }
 ```
 
-If the binary isn't in your PATH, use the full path to it in the `"command"` field.
+For **multiple instances**, use a config file instead (see [mcp-server-rs/README.md](mcp-server-rs/README.md#multiple-instances-config-file)):
+
+```json
+{
+  "mcpServers": {
+    "webmethods-is": {
+      "command": "wm-mcp-server",
+      "env": {
+        "WM_CONFIG": "/path/to/wm-instances.json"
+      }
+    }
+  }
+}
+```
 
 ### 3. Use
 

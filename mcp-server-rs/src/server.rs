@@ -8,6 +8,7 @@ use rmcp::{
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::borrow::Cow;
+use std::collections::HashMap;
 use std::sync::Arc;
 
 fn mcp_err(msg: String) -> ErrorData {
@@ -27,13 +28,21 @@ fn json_result(v: &Value) -> Result<CallToolResult, ErrorData> {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// Parameter structs
+// Parameter structs -- every struct includes an optional `instance` field
 // ═══════════════════════════════════════════════════════════════════════
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct InstanceOnlyParam {
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
+}
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct PackageNameParam {
     #[schemars(description = "Package name in PascalCase (e.g., \"MyNewPackage\")")]
     pub package_name: String,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -44,12 +53,16 @@ pub struct NodeListParam {
         description = "Optional folder path (e.g., \"services.utils\"). Empty = package root."
     )]
     pub folder: Option<String>,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct NodeNameParam {
     #[schemars(description = "Full namespace path (e.g., \"claudedemo.services:helloWorld\")")]
     pub name: String,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -58,6 +71,8 @@ pub struct FolderCreateParam {
     pub package: String,
     #[schemars(description = "Dot-separated path (e.g., \"services\" or \"services.utils\")")]
     pub folder_path: String,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -66,6 +81,8 @@ pub struct FlowServiceCreateParam {
     pub package: String,
     #[schemars(description = "Path as \"folder:serviceName\" (e.g., \"services:helloWorld\")")]
     pub service_path: String,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -74,6 +91,8 @@ pub struct PutNodeParam {
         description = "JSON string with the full node definition following IS Values serialization format"
     )]
     pub node_data: String,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -82,6 +101,8 @@ pub struct DocumentTypeCreateParam {
     pub package: String,
     #[schemars(description = "Document path as \"folder.docTypes:docName\"")]
     pub doc_path: String,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -90,12 +111,16 @@ pub struct ServiceInvokeParam {
     pub service_path: String,
     #[schemars(description = "JSON string of input parameters")]
     pub inputs: Option<String>,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct ShutdownParam {
     #[schemars(description = "If true, restart the server instead of stopping it")]
     pub bounce: Option<bool>,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -104,6 +129,8 @@ pub struct PortKeyPkgParam {
     pub port_key: String,
     #[schemars(description = "Package that owns the listener (e.g., \"WmRoot\")")]
     pub pkg: String,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -112,6 +139,8 @@ pub struct PortAddParam {
         description = "JSON string with listener configuration including \"factoryKey\" and \"pkg\""
     )]
     pub settings: String,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -122,12 +151,16 @@ pub struct PortUpdateParam {
     pub pkg: String,
     #[schemars(description = "JSON string with properties to update")]
     pub settings: String,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct AdapterTypeParam {
     #[schemars(description = "Adapter type (e.g., \"WmSAP\", \"WmOPCAdapter\", \"JDBCAdapter\")")]
     pub adapter_type: String,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -138,6 +171,8 @@ pub struct AdapterConnectionMetadataParam {
     pub adapter_type: String,
     #[schemars(description = "Factory class name")]
     pub connection_factory_type: String,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -158,12 +193,16 @@ pub struct AdapterConnectionCreateParam {
     pub pool_min: Option<i32>,
     #[schemars(description = "Max pool size")]
     pub pool_max: Option<i32>,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct ConnectionAliasParam {
     #[schemars(description = "Connection alias (e.g., \"demosap:connNode_sap\")")]
     pub connection_alias: String,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -178,12 +217,16 @@ pub struct AdapterListenerCreateParam {
     pub connection_alias: String,
     #[schemars(description = "JSON string of listener properties")]
     pub listener_settings: Option<String>,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct ListenerAliasParam {
     #[schemars(description = "Listener alias")]
     pub listener_alias: String,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -200,6 +243,8 @@ pub struct AdapterServiceCreateParam {
     pub service_template: String,
     #[schemars(description = "JSON string of service-specific settings")]
     pub adapter_service_settings: Option<String>,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -214,6 +259,8 @@ pub struct AdapterNotificationPollingParam {
     pub notification_template: String,
     #[schemars(description = "JSON string of properties")]
     pub notification_settings: Option<String>,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -228,6 +275,8 @@ pub struct AdapterNotificationListenerParam {
     pub notification_template: String,
     #[schemars(description = "JSON string of properties")]
     pub notification_settings: Option<String>,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -242,7 +291,8 @@ pub struct MapsetValueParam {
 
 #[derive(Clone)]
 pub struct WmServer {
-    client: Arc<ISClient>,
+    clients: HashMap<String, Arc<ISClient>>,
+    default_instance: String,
     tool_router: ToolRouter<WmServer>,
 }
 
@@ -258,23 +308,63 @@ fn parse_optional_json(s: &Option<String>) -> Result<Option<Value>, String> {
     }
 }
 
+impl WmServer {
+    fn get_client(&self, instance: &Option<String>) -> Result<&ISClient, ErrorData> {
+        let name = instance.as_deref().unwrap_or(&self.default_instance);
+        self.clients.get(name).map(|c| c.as_ref()).ok_or_else(|| {
+            let available: Vec<&str> = self.clients.keys().map(|s| s.as_str()).collect();
+            ErrorData {
+                code: ErrorCode::INVALID_PARAMS,
+                message: Cow::Owned(format!(
+                    "Unknown instance '{name}'. Available: {available:?}"
+                )),
+                data: None,
+            }
+        })
+    }
+}
+
 #[tool_router]
 impl WmServer {
-    pub fn new(client: ISClient) -> Self {
+    pub fn new(clients: HashMap<String, Arc<ISClient>>, default_instance: String) -> Self {
         Self {
-            client: Arc::new(client),
+            clients,
+            default_instance,
             tool_router: Self::tool_router(),
         }
+    }
+
+    // ── Instance Management ────────────────────────────────────────────
+
+    #[tool(
+        description = "List all configured Integration Server instances.\n\nReturns instance names and which one is the default. Use an instance name in the 'instance' parameter of any other tool to target a specific server."
+    )]
+    async fn list_instances(&self) -> Result<CallToolResult, ErrorData> {
+        let instances: Vec<Value> = self
+            .clients
+            .keys()
+            .map(|name| {
+                json!({
+                    "name": name,
+                    "default": name == &self.default_instance,
+                })
+            })
+            .collect();
+        json_result(&json!({ "instances": instances }))
     }
 
     // ── Server Status ──────────────────────────────────────────────────
 
     #[tool(description = "Check if the Integration Server is running and responsive.")]
-    async fn is_status(&self) -> Result<CallToolResult, ErrorData> {
-        if !self.client.is_running().await {
+    async fn is_status(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        if !c.is_running().await {
             return text_result("Server is NOT running or not responding on the configured port.");
         }
-        match self.client.get_server_status().await {
+        match c.get_server_status().await {
             Ok(status) => text_result(&format!(
                 "Server is RUNNING.\n{}",
                 serde_json::to_string_pretty(&status).unwrap_or_default()
@@ -290,7 +380,8 @@ impl WmServer {
         &self,
         Parameters(p): Parameters<ShutdownParam>,
     ) -> Result<CallToolResult, ErrorData> {
-        match self.client.shutdown(p.bounce.unwrap_or(false)).await {
+        let c = self.get_client(&p.instance)?;
+        match c.shutdown(p.bounce.unwrap_or(false)).await {
             Ok(v) => json_result(&v),
             Err(e) => text_result(&format!("Shutdown failed: {e}")),
         }
@@ -299,8 +390,12 @@ impl WmServer {
     // ── Package Management ─────────────────────────────────────────────
 
     #[tool(description = "List all packages on the Integration Server.")]
-    async fn package_list(&self) -> Result<CallToolResult, ErrorData> {
-        json_result(&self.client.package_list().await.map_err(mcp_err)?)
+    async fn package_list(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        json_result(&c.package_list().await.map_err(mcp_err)?)
     }
 
     #[tool(description = "Create and activate a new package.")]
@@ -308,13 +403,8 @@ impl WmServer {
         &self,
         Parameters(p): Parameters<PackageNameParam>,
     ) -> Result<CallToolResult, ErrorData> {
-        json_result(
-            &self
-                .client
-                .package_create(&p.package_name)
-                .await
-                .map_err(mcp_err)?,
-        )
+        let c = self.get_client(&p.instance)?;
+        json_result(&c.package_create(&p.package_name).await.map_err(mcp_err)?)
     }
 
     #[tool(description = "Reload a package to pick up changes.")]
@@ -322,13 +412,8 @@ impl WmServer {
         &self,
         Parameters(p): Parameters<PackageNameParam>,
     ) -> Result<CallToolResult, ErrorData> {
-        json_result(
-            &self
-                .client
-                .package_reload(&p.package_name)
-                .await
-                .map_err(mcp_err)?,
-        )
+        let c = self.get_client(&p.instance)?;
+        json_result(&c.package_reload(&p.package_name).await.map_err(mcp_err)?)
     }
 
     #[tool(description = "Enable a package.")]
@@ -336,13 +421,8 @@ impl WmServer {
         &self,
         Parameters(p): Parameters<PackageNameParam>,
     ) -> Result<CallToolResult, ErrorData> {
-        json_result(
-            &self
-                .client
-                .package_enable(&p.package_name)
-                .await
-                .map_err(mcp_err)?,
-        )
+        let c = self.get_client(&p.instance)?;
+        json_result(&c.package_enable(&p.package_name).await.map_err(mcp_err)?)
     }
 
     #[tool(description = "Disable a package.")]
@@ -350,13 +430,8 @@ impl WmServer {
         &self,
         Parameters(p): Parameters<PackageNameParam>,
     ) -> Result<CallToolResult, ErrorData> {
-        json_result(
-            &self
-                .client
-                .package_disable(&p.package_name)
-                .await
-                .map_err(mcp_err)?,
-        )
+        let c = self.get_client(&p.instance)?;
+        json_result(&c.package_disable(&p.package_name).await.map_err(mcp_err)?)
     }
 
     // ── Namespace Browsing ─────────────────────────────────────────────
@@ -366,10 +441,9 @@ impl WmServer {
         &self,
         Parameters(p): Parameters<NodeListParam>,
     ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
         json_result(
-            &self
-                .client
-                .node_list(&p.package, p.folder.as_deref().unwrap_or(""))
+            &c.node_list(&p.package, p.folder.as_deref().unwrap_or(""))
                 .await
                 .map_err(mcp_err)?,
         )
@@ -382,7 +456,8 @@ impl WmServer {
         &self,
         Parameters(p): Parameters<NodeNameParam>,
     ) -> Result<CallToolResult, ErrorData> {
-        json_result(&self.client.node_get(&p.name).await.map_err(mcp_err)?)
+        let c = self.get_client(&p.instance)?;
+        json_result(&c.node_get(&p.name).await.map_err(mcp_err)?)
     }
 
     #[tool(description = "Delete a node (service, folder, document type).")]
@@ -390,7 +465,8 @@ impl WmServer {
         &self,
         Parameters(p): Parameters<NodeNameParam>,
     ) -> Result<CallToolResult, ErrorData> {
-        match self.client.node_delete(&p.name).await {
+        let c = self.get_client(&p.instance)?;
+        match c.node_delete(&p.name).await {
             Ok(v) => json_result(&v),
             Err(e) => text_result(&format!("Delete failed: {e}")),
         }
@@ -405,10 +481,9 @@ impl WmServer {
         &self,
         Parameters(p): Parameters<FolderCreateParam>,
     ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
         json_result(
-            &self
-                .client
-                .folder_create(&p.package, &p.folder_path)
+            &c.folder_create(&p.package, &p.folder_path)
                 .await
                 .map_err(mcp_err)?,
         )
@@ -421,10 +496,9 @@ impl WmServer {
         &self,
         Parameters(p): Parameters<FlowServiceCreateParam>,
     ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
         json_result(
-            &self
-                .client
-                .service_create(&p.package, &p.service_path)
+            &c.service_create(&p.package, &p.service_path)
                 .await
                 .map_err(mcp_err)?,
         )
@@ -437,11 +511,12 @@ impl WmServer {
         &self,
         Parameters(p): Parameters<PutNodeParam>,
     ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
         let data = match parse_json(&p.node_data) {
             Ok(v) => v,
             Err(e) => return text_result(&e),
         };
-        match self.client.put_node(&data).await {
+        match c.put_node(&data).await {
             Ok(v) => json_result(&v),
             Err(e) => text_result(&format!("putNode failed: {e}")),
         }
@@ -454,10 +529,9 @@ impl WmServer {
         &self,
         Parameters(p): Parameters<DocumentTypeCreateParam>,
     ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
         json_result(
-            &self
-                .client
-                .document_type_create(&p.package, &p.doc_path)
+            &c.document_type_create(&p.package, &p.doc_path)
                 .await
                 .map_err(mcp_err)?,
         )
@@ -470,6 +544,7 @@ impl WmServer {
         &self,
         Parameters(p): Parameters<ServiceInvokeParam>,
     ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
         let inputs = match &p.inputs {
             None => None,
             Some(s) if s.is_empty() => None,
@@ -478,11 +553,7 @@ impl WmServer {
                 Err(e) => return text_result(&format!("Invalid JSON input: {e}")),
             },
         };
-        match self
-            .client
-            .service_invoke(&p.service_path, inputs.as_ref())
-            .await
-        {
+        match c.service_invoke(&p.service_path, inputs.as_ref()).await {
             Ok(v) => json_result(&v),
             Err(e) => text_result(&format!("Service invocation failed: {e}")),
         }
@@ -493,15 +564,23 @@ impl WmServer {
     #[tool(
         description = "List all ports/listeners (HTTP, HTTPS, FTP, FTPS, FilePolling, Email, WebSocket).\n\nReturns detailed configuration for each port including protocol, status, and settings."
     )]
-    async fn port_list(&self) -> Result<CallToolResult, ErrorData> {
-        json_result(&self.client.port_list().await.map_err(mcp_err)?)
+    async fn port_list(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        json_result(&c.port_list().await.map_err(mcp_err)?)
     }
 
     #[tool(
         description = "List available listener factory types that can be used to create new ports.\n\nCommon factories: webMethods/HTTP, webMethods/FTP, webMethods/FTPS, webMethods/FilePolling, webMethods/Email, webMethods/WebSocket."
     )]
-    async fn port_factory_list(&self) -> Result<CallToolResult, ErrorData> {
-        json_result(&self.client.port_factory_list().await.map_err(mcp_err)?)
+    async fn port_factory_list(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        json_result(&c.port_factory_list().await.map_err(mcp_err)?)
     }
 
     #[tool(description = "Get detailed configuration of a specific port/listener.")]
@@ -509,7 +588,8 @@ impl WmServer {
         &self,
         Parameters(p): Parameters<PortKeyPkgParam>,
     ) -> Result<CallToolResult, ErrorData> {
-        match self.client.port_get(&p.port_key, &p.pkg).await {
+        let c = self.get_client(&p.instance)?;
+        match c.port_get(&p.port_key, &p.pkg).await {
             Ok(v) => json_result(&v),
             Err(e) => text_result(&format!("Failed: {e}")),
         }
@@ -522,11 +602,12 @@ impl WmServer {
         &self,
         Parameters(p): Parameters<PortAddParam>,
     ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
         let data = match parse_json(&p.settings) {
             Ok(v) => v,
             Err(e) => return text_result(&e),
         };
-        match self.client.port_add(&data).await {
+        match c.port_add(&data).await {
             Ok(v) => json_result(&v),
             Err(e) => text_result(&format!("Failed: {e}")),
         }
@@ -537,11 +618,12 @@ impl WmServer {
         &self,
         Parameters(p): Parameters<PortUpdateParam>,
     ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
         let data = match parse_json(&p.settings) {
             Ok(v) => v,
             Err(e) => return text_result(&e),
         };
-        match self.client.port_update(&p.port_key, &p.pkg, &data).await {
+        match c.port_update(&p.port_key, &p.pkg, &data).await {
             Ok(v) => json_result(&v),
             Err(e) => text_result(&format!("Failed: {e}")),
         }
@@ -552,7 +634,8 @@ impl WmServer {
         &self,
         Parameters(p): Parameters<PortKeyPkgParam>,
     ) -> Result<CallToolResult, ErrorData> {
-        match self.client.port_enable(&p.port_key, &p.pkg).await {
+        let c = self.get_client(&p.instance)?;
+        match c.port_enable(&p.port_key, &p.pkg).await {
             Ok(v) => json_result(&v),
             Err(e) => text_result(&format!("Failed: {e}")),
         }
@@ -563,7 +646,8 @@ impl WmServer {
         &self,
         Parameters(p): Parameters<PortKeyPkgParam>,
     ) -> Result<CallToolResult, ErrorData> {
-        match self.client.port_disable(&p.port_key, &p.pkg).await {
+        let c = self.get_client(&p.instance)?;
+        match c.port_disable(&p.port_key, &p.pkg).await {
             Ok(v) => json_result(&v),
             Err(e) => text_result(&format!("Failed: {e}")),
         }
@@ -574,7 +658,8 @@ impl WmServer {
         &self,
         Parameters(p): Parameters<PortKeyPkgParam>,
     ) -> Result<CallToolResult, ErrorData> {
-        match self.client.port_delete(&p.port_key, &p.pkg).await {
+        let c = self.get_client(&p.instance)?;
+        match c.port_delete(&p.port_key, &p.pkg).await {
             Ok(v) => json_result(&v),
             Err(e) => text_result(&format!("Failed: {e}")),
         }
@@ -585,8 +670,12 @@ impl WmServer {
     #[tool(
         description = "List all registered adapter types (JDBC, SAP, OPC, MongoDB, etc.).\n\nReturns adapter names, versions, and vendors. Use the adapterName value as the adapter_type parameter in other adapter tools."
     )]
-    async fn adapter_type_list(&self) -> Result<CallToolResult, ErrorData> {
-        match self.client.adapter_type_list().await {
+    async fn adapter_type_list(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.adapter_type_list().await {
             Ok(v) => json_result(&v),
             Err(e) => text_result(&format!("Failed: {e}")),
         }
@@ -599,8 +688,8 @@ impl WmServer {
         &self,
         Parameters(p): Parameters<AdapterConnectionMetadataParam>,
     ) -> Result<CallToolResult, ErrorData> {
-        match self
-            .client
+        let c = self.get_client(&p.instance)?;
+        match c
             .adapter_connection_metadata(&p.adapter_type, &p.connection_factory_type)
             .await
         {
@@ -610,14 +699,12 @@ impl WmServer {
     }
 
     #[tool(description = "List all adapter connections.")]
-    async fn adapter_connection_list(&self) -> Result<CallToolResult, ErrorData> {
-        json_result(
-            &self
-                .client
-                .adapter_connection_list()
-                .await
-                .map_err(mcp_err)?,
-        )
+    async fn adapter_connection_list(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        json_result(&c.adapter_connection_list().await.map_err(mcp_err)?)
     }
 
     #[tool(description = "Create an adapter connection via WmART API.")]
@@ -625,6 +712,7 @@ impl WmServer {
         &self,
         Parameters(p): Parameters<AdapterConnectionCreateParam>,
     ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
         let settings = match parse_json(&p.connection_settings) {
             Ok(v) => v,
             Err(e) => return text_result(&e),
@@ -641,8 +729,7 @@ impl WmServer {
             "startupRetryCount": "0",
             "startupBackoffSecs": "5",
         });
-        match self
-            .client
+        match c
             .adapter_connection_create(
                 &p.connection_alias,
                 &p.package_name,
@@ -663,11 +750,8 @@ impl WmServer {
         &self,
         Parameters(p): Parameters<ConnectionAliasParam>,
     ) -> Result<CallToolResult, ErrorData> {
-        match self
-            .client
-            .adapter_connection_enable(&p.connection_alias)
-            .await
-        {
+        let c = self.get_client(&p.instance)?;
+        match c.adapter_connection_enable(&p.connection_alias).await {
             Ok(v) => json_result(&v),
             Err(e) => text_result(&format!("Failed: {e}")),
         }
@@ -678,11 +762,8 @@ impl WmServer {
         &self,
         Parameters(p): Parameters<ConnectionAliasParam>,
     ) -> Result<CallToolResult, ErrorData> {
-        match self
-            .client
-            .adapter_connection_disable(&p.connection_alias)
-            .await
-        {
+        let c = self.get_client(&p.instance)?;
+        match c.adapter_connection_disable(&p.connection_alias).await {
             Ok(v) => json_result(&v),
             Err(e) => text_result(&format!("Failed: {e}")),
         }
@@ -693,11 +774,8 @@ impl WmServer {
         &self,
         Parameters(p): Parameters<ConnectionAliasParam>,
     ) -> Result<CallToolResult, ErrorData> {
-        match self
-            .client
-            .adapter_connection_state(&p.connection_alias)
-            .await
-        {
+        let c = self.get_client(&p.instance)?;
+        match c.adapter_connection_state(&p.connection_alias).await {
             Ok(v) => json_result(&v),
             Err(e) => text_result(&format!("Failed: {e}")),
         }
@@ -710,10 +788,9 @@ impl WmServer {
         &self,
         Parameters(p): Parameters<AdapterTypeParam>,
     ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
         json_result(
-            &self
-                .client
-                .adapter_listener_list(&p.adapter_type)
+            &c.adapter_listener_list(&p.adapter_type)
                 .await
                 .map_err(mcp_err)?,
         )
@@ -724,12 +801,12 @@ impl WmServer {
         &self,
         Parameters(p): Parameters<AdapterListenerCreateParam>,
     ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
         let settings = match parse_optional_json(&p.listener_settings) {
             Ok(v) => v,
             Err(e) => return text_result(&e),
         };
-        match self
-            .client
+        match c
             .adapter_listener_create(
                 &p.listener_alias,
                 &p.package_name,
@@ -749,7 +826,8 @@ impl WmServer {
         &self,
         Parameters(p): Parameters<ListenerAliasParam>,
     ) -> Result<CallToolResult, ErrorData> {
-        match self.client.adapter_listener_enable(&p.listener_alias).await {
+        let c = self.get_client(&p.instance)?;
+        match c.adapter_listener_enable(&p.listener_alias).await {
             Ok(v) => json_result(&v),
             Err(e) => text_result(&format!("Failed: {e}")),
         }
@@ -760,11 +838,8 @@ impl WmServer {
         &self,
         Parameters(p): Parameters<ListenerAliasParam>,
     ) -> Result<CallToolResult, ErrorData> {
-        match self
-            .client
-            .adapter_listener_disable(&p.listener_alias)
-            .await
-        {
+        let c = self.get_client(&p.instance)?;
+        match c.adapter_listener_disable(&p.listener_alias).await {
             Ok(v) => json_result(&v),
             Err(e) => text_result(&format!("Failed: {e}")),
         }
@@ -779,12 +854,12 @@ impl WmServer {
         &self,
         Parameters(p): Parameters<AdapterServiceCreateParam>,
     ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
         let settings = match parse_optional_json(&p.adapter_service_settings) {
             Ok(v) => v,
             Err(e) => return text_result(&e),
         };
-        match self
-            .client
+        match c
             .adapter_service_create(
                 &p.service_name,
                 &p.package_name,
@@ -806,10 +881,9 @@ impl WmServer {
         &self,
         Parameters(p): Parameters<AdapterTypeParam>,
     ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
         json_result(
-            &self
-                .client
-                .adapter_notification_list(&p.adapter_type)
+            &c.adapter_notification_list(&p.adapter_type)
                 .await
                 .map_err(mcp_err)?,
         )
@@ -822,12 +896,12 @@ impl WmServer {
         &self,
         Parameters(p): Parameters<AdapterNotificationPollingParam>,
     ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
         let settings = match parse_optional_json(&p.notification_settings) {
             Ok(v) => v,
             Err(e) => return text_result(&e),
         };
-        match self
-            .client
+        match c
             .adapter_notification_create_polling(
                 &p.notification_name,
                 &p.package_name,
@@ -849,12 +923,12 @@ impl WmServer {
         &self,
         Parameters(p): Parameters<AdapterNotificationListenerParam>,
     ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
         let settings = match parse_optional_json(&p.notification_settings) {
             Ok(v) => v,
             Err(e) => return text_result(&e),
         };
-        match self
-            .client
+        match c
             .adapter_notification_create_listener(
                 &p.notification_name,
                 &p.package_name,
@@ -899,7 +973,8 @@ impl ServerHandler for WmServer {
                 env!("CARGO_PKG_VERSION"),
             ))
             .with_instructions(concat!(
-                "MCP server for managing webMethods Integration Server via pure HTTP API.\n\n",
+                "MCP server for managing one or more webMethods Integration Server instances via pure HTTP API.\n\n",
+                "MULTI-INSTANCE: Use list_instances to see available servers. Pass 'instance' parameter to target a specific one (omit for default).\n\n",
                 "KEY CONCEPTS:\n",
                 "- Packages contain services, document types, and adapter configurations\n",
                 "- Services are identified by \"folder.subfolder:serviceName\" paths\n",

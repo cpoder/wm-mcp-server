@@ -13,8 +13,10 @@ Claude Code / AI Assistant
         |
         | HTTP/JSON (Basic Auth)
         v
-  webMethods Integration Server
-    (any host, port 5555)
+  webMethods IS instance(s)
+    dev  (host-a:5555)
+    prod (host-b:5555)
+    ...
 ```
 
 ## Installation
@@ -40,6 +42,8 @@ cargo build --release
 
 ## Configuration
 
+### Single instance (environment variables)
+
 Add to your `.mcp.json` (Claude Code, IBM Bob, or any MCP client):
 
 ```json
@@ -57,25 +61,6 @@ Add to your `.mcp.json` (Claude Code, IBM Bob, or any MCP client):
 }
 ```
 
-If the binary isn't in your PATH, use the full path:
-
-```json
-{
-  "mcpServers": {
-    "webmethods-is": {
-      "command": "/path/to/wm-mcp-server",
-      "env": {
-        "WM_IS_URL": "http://your-is-host:5555",
-        "WM_IS_USER": "Administrator",
-        "WM_IS_PASSWORD": "your-password"
-      }
-    }
-  }
-}
-```
-
-### Environment Variables
-
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `WM_IS_URL` | `http://localhost:5555` | IS base URL |
@@ -83,7 +68,53 @@ If the binary isn't in your PATH, use the full path:
 | `WM_IS_PASSWORD` | `manage` | IS password |
 | `WM_IS_TIMEOUT` | `30` | HTTP request timeout (seconds) |
 
-## Tools (39 total)
+### Multiple instances (config file)
+
+Create a JSON config file (e.g., `wm-instances.json`):
+
+```json
+{
+  "instances": {
+    "dev": {
+      "url": "http://dev-host:5555",
+      "user": "Administrator",
+      "password": "manage"
+    },
+    "prod": {
+      "url": "http://prod-host:5555",
+      "user": "Administrator",
+      "password": "secret",
+      "timeout": 60
+    }
+  },
+  "default": "dev"
+}
+```
+
+Point to it via `WM_CONFIG`:
+
+```json
+{
+  "mcpServers": {
+    "webmethods-is": {
+      "command": "wm-mcp-server",
+      "env": {
+        "WM_CONFIG": "/path/to/wm-instances.json"
+      }
+    }
+  }
+}
+```
+
+Every tool accepts an optional `instance` parameter to target a specific server. Omit it to use the default. Use `list_instances` to see all configured instances.
+
+## Tools (40 total)
+
+### Instance Management (1)
+
+| Tool | Description |
+|------|-------------|
+| `list_instances` | List all configured IS instances and which is the default |
 
 ### Server Management (2)
 
