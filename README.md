@@ -1,0 +1,142 @@
+# webMethods Integration Server MCP Server
+
+An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that gives AI assistants full control over [webMethods Integration Server](https://www.ibm.com/docs/en/webmethods-integration/wm-integration-server/11.1.0) through **pure HTTP APIs**. No filesystem access to the IS installation is required -- it works with any remote IS instance.
+
+Built for [Claude Code](https://docs.anthropic.com/en/docs/claude-code), but compatible with any MCP client.
+
+## What can it do?
+
+| Capability | Examples |
+|---|---|
+| **Flow services** | Create services with full logic (INVOKE, MAP, BRANCH, LOOP), set input/output signatures, test them -- all in one API call |
+| **Packages** | Create, reload, enable, disable |
+| **Ports** | Manage HTTP, FTP, FTPS, FilePolling, Email, WebSocket listeners |
+| **JDBC adapters** | Connect to databases (SQL Server, PostgreSQL, Oracle, ...), create CustomSQL / Select / Insert services, configure polling notifications |
+| **SAP adapters** | Create SAP connections, RFC listeners, IDoc notifications |
+| **OPC UA adapters** | Create OPC connections, subscription listeners |
+| **Server admin** | Check status, shutdown, restart |
+
+### 39 tools across 7 categories
+
+```
+Server          is_status, is_shutdown
+Packages        package_list, package_create, package_reload, package_enable, package_disable
+Namespace       node_list, node_get, node_delete, folder_create
+Services        flow_service_create, put_node, service_invoke, mapset_value, document_type_create
+Ports           port_list, port_factory_list, port_get, port_add, port_update, port_enable, port_disable, port_delete
+Adapters        adapter_type_list, adapter_connection_metadata, adapter_connection_list,
+                adapter_connection_create, adapter_connection_enable, adapter_connection_disable,
+                adapter_connection_state, adapter_service_create, adapter_listener_list,
+                adapter_listener_create, adapter_listener_enable, adapter_listener_disable,
+                adapter_notification_list, adapter_notification_create_polling,
+                adapter_notification_create_listener_based
+```
+
+## Quick Start
+
+### 1. Install
+
+```bash
+git clone https://github.com/cpoder/wm-mcp-server.git
+cd wm-mcp-server
+python3 -m venv venv
+source venv/bin/activate
+pip install mcp httpx
+```
+
+### 2. Configure
+
+Create `.mcp.json` in your project directory:
+
+```json
+{
+  "mcpServers": {
+    "webmethods-is": {
+      "command": "/path/to/wm-mcp-server/venv/bin/python",
+      "args": ["/path/to/wm-mcp-server/mcp-server/server.py"],
+      "env": {
+        "PYTHONPATH": "/path/to/wm-mcp-server/mcp-server",
+        "WM_IS_URL": "http://your-is-host:5555",
+        "WM_IS_USER": "Administrator",
+        "WM_IS_PASSWORD": "manage"
+      }
+    }
+  }
+}
+```
+
+### 3. Use
+
+Ask Claude to create a flow service:
+
+> "Create a flow service in package MyDemo that takes a name as input, calls pub.string:concat to build a greeting, and returns it."
+
+Claude will use `package_create`, `folder_create`, `flow_service_create`, `put_node`, and `service_invoke` to build and test the service automatically.
+
+## How it works
+
+The server communicates with webMethods IS through its built-in HTTP services:
+
+```
+Claude Code ──MCP──> Python MCP Server ──HTTP/JSON──> webMethods IS (port 5555)
+```
+
+The key technical discovery is that the IS `wm.server.ns/putNode` API accepts a **complete flow tree as JSON**, including nested step definitions. This was found by decompiling `wm-isclient.jar` (specifically the `FlowElement` class hierarchy) to understand the internal serialization format.
+
+This means a single HTTP POST can create a fully functional flow service with:
+- Input/output signatures
+- INVOKE steps (calling other services with input/output mappings)
+- MAP steps (setting, copying, deleting pipeline variables)
+- BRANCH steps (conditional logic with switch/case)
+- LOOP steps (iterating over arrays)
+- SEQUENCE, EXIT, and more
+
+## Example: JDBC adapter querying SQL Server
+
+```python
+# 1. Create a JDBC connection
+adapter_connection_create(
+    connection_alias="myapp.db:sqlserver",
+    package_name="MyApp",
+    adapter_type="JDBCAdapter",
+    connection_factory_type="com.wm.adapter.wmjdbc.connection.JDBCConnectionFactory",
+    connection_settings='{"transactionType":"NO_TRANSACTION","driverType":"Default","datasourceClass":"com.microsoft.sqlserver.jdbc.SQLServerDataSource","serverName":"localhost","user":"sa","password":"...","databaseName":"mydb","portNumber":"1433","otherProperties":"encrypt=false"}'
+)
+
+# 2. Enable it
+adapter_connection_enable("myapp.db:sqlserver")
+
+# 3. Create a CustomSQL service
+adapter_service_create(
+    service_name="myapp.services:getCustomers",
+    package_name="MyApp",
+    connection_alias="myapp.db:sqlserver",
+    service_template="com.wm.adapter.wmjdbc.services.CustomSQL",
+    adapter_service_settings='{"sql":"SELECT id, name, email FROM customers WHERE name = ?","inputExpression":["name"],"inputJDBCType":["VARCHAR"],"inputFieldType":["java.lang.String"],"inputField":["name"],"outputExpression":["id","name","email"],"outputJDBCType":["INTEGER","VARCHAR","VARCHAR"],"outputFieldType":["java.lang.String","java.lang.String","java.lang.String"],"resultFieldType":["java.lang.String","java.lang.String","java.lang.String"],"outputField":["id","name","email"],"resultField":["id","name","email"],"realOutputField":["id","name","email"]}'
+)
+
+# 4. Query it
+service_invoke("myapp.services:getCustomers", '{"getCustomersInput":{"name":"Alice"}}')
+# {"getCustomersOutput":{"results":[{"id":"1","name":"Alice","email":"alice@example.com"}]}}
+```
+
+## Documentation
+
+See [mcp-server/README.md](mcp-server/README.md) for full documentation including:
+- All 39 tools with parameters
+- Complete `put_node` JSON format reference
+- Flow step types (INVOKE, MAP, BRANCH, LOOP, etc.)
+- WmPath format for field references
+- Adapter connection settings for JDBC, SAP, OPC
+- Adapter service and notification templates
+- All IS API endpoints used
+
+## Requirements
+
+- Python 3.10+
+- webMethods Integration Server 11.x with HTTP access
+- IS admin credentials
+
+## License
+
+MIT
