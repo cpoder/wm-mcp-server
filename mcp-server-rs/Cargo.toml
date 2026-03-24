@@ -1,0 +1,30 @@
+[package]
+name = "wm-mcp-server"
+version = "0.1.0"
+edition = "2024"
+description = "MCP server for managing webMethods Integration Server via pure HTTP API"
+license = "MIT"
+repository = "https://github.com/cpoder/wm-mcp-server"
+keywords = ["mcp", "webmethods", "integration-server"]
+categories = ["development-tools"]
+
+[[bin]]
+name = "wm-mcp-server"
+path = "src/main.rs"
+
+[dependencies]
+rmcp = { version = "1.2", features = ["server", "transport-io", "macros"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "io-std"] }
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+schemars = "1.0"
+base64 = "0.22"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+anyhow = "1.0"
+
+[profile.release]
+strip = true
+lto = true
+opt-level = "z"

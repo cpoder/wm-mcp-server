@@ -1,6 +1,6 @@
 # webMethods Integration Server MCP Server
 
-An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that gives AI assistants full control over [webMethods Integration Server](https://www.ibm.com/docs/en/webmethods-integration/wm-integration-server/11.1.0) through **pure HTTP APIs**. No filesystem access to the IS installation is required -- it works with any remote IS instance.
+An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that gives AI assistants full control over [webMethods Integration Server](https://www.ibm.com/docs/en/webmethods-integration/wm-integration-server/11.1.0) through **pure HTTP APIs**. Single binary, no runtime dependencies. Works with any remote IS instance.
 
 Compatible with any [MCP client](https://modelcontextprotocol.io/) (IBM Bob, Claude Code, Claude Desktop, Cursor, Windsurf, etc.).
 
@@ -36,13 +36,24 @@ Adapters        adapter_type_list, adapter_connection_metadata, adapter_connecti
 
 ### 1. Install
 
+**Option A: cargo install (from source)**
+
+```bash
+cargo install --git https://github.com/cpoder/wm-mcp-server.git
+```
+
+**Option B: build locally**
+
 ```bash
 git clone https://github.com/cpoder/wm-mcp-server.git
-cd wm-mcp-server
-python3 -m venv venv
-source venv/bin/activate
-pip install mcp httpx
+cd wm-mcp-server/mcp-server-rs
+cargo build --release
+# Binary at target/release/wm-mcp-server
 ```
+
+**Option C: download pre-built binary**
+
+Download from [Releases](https://github.com/cpoder/wm-mcp-server/releases) and place in your PATH.
 
 ### 2. Configure
 
@@ -52,10 +63,8 @@ Create `.mcp.json` in your project directory:
 {
   "mcpServers": {
     "webmethods-is": {
-      "command": "/path/to/wm-mcp-server/venv/bin/python",
-      "args": ["/path/to/wm-mcp-server/mcp-server/server.py"],
+      "command": "wm-mcp-server",
       "env": {
-        "PYTHONPATH": "/path/to/wm-mcp-server/mcp-server",
         "WM_IS_URL": "http://your-is-host:5555",
         "WM_IS_USER": "Administrator",
         "WM_IS_PASSWORD": "manage"
@@ -65,20 +74,22 @@ Create `.mcp.json` in your project directory:
 }
 ```
 
+If the binary isn't in your PATH, use the full path to it in the `"command"` field.
+
 ### 3. Use
 
-Ask Claude to create a flow service:
+Ask your AI assistant to create a flow service:
 
 > "Create a flow service in package MyDemo that takes a name as input, calls pub.string:concat to build a greeting, and returns it."
 
-Claude will use `package_create`, `folder_create`, `flow_service_create`, `put_node`, and `service_invoke` to build and test the service automatically.
+The assistant will use `package_create`, `folder_create`, `flow_service_create`, `put_node`, and `service_invoke` to build and test the service automatically.
 
 ## How it works
 
 The server communicates with webMethods IS exclusively through its built-in HTTP admin services (`wm.server.ns`, `wm.art.dev`, `pub.art`):
 
 ```
-Claude Code ──MCP──> Python MCP Server ──HTTP/JSON──> webMethods IS (port 5555)
+AI Assistant ──MCP (stdio)──> wm-mcp-server ──HTTP/JSON──> webMethods IS (port 5555)
 ```
 
 Flow service creation leverages the `wm.server.ns/putNode` API, which accepts the full flow tree as JSON -- signatures, steps, and mappings in a single call. The JSON structure mirrors the internal `FlowElement` / `Values` serialization used by the IS runtime (same format consumed by `FlowElement.create(Values)` in `wm-isclient.jar`).
@@ -91,7 +102,7 @@ A single `put_node` call can define a complete flow service including:
 
 ## Example: JDBC adapter querying SQL Server
 
-```python
+```
 # 1. Create a JDBC connection
 adapter_connection_create(
     connection_alias="myapp.db:sqlserver",
@@ -110,7 +121,7 @@ adapter_service_create(
     package_name="MyApp",
     connection_alias="myapp.db:sqlserver",
     service_template="com.wm.adapter.wmjdbc.services.CustomSQL",
-    adapter_service_settings='{"sql":"SELECT id, name, email FROM customers WHERE name = ?","inputExpression":["name"],"inputJDBCType":["VARCHAR"],"inputFieldType":["java.lang.String"],"inputField":["name"],"outputExpression":["id","name","email"],"outputJDBCType":["INTEGER","VARCHAR","VARCHAR"],"outputFieldType":["java.lang.String","java.lang.String","java.lang.String"],"resultFieldType":["java.lang.String","java.lang.String","java.lang.String"],"outputField":["id","name","email"],"resultField":["id","name","email"],"realOutputField":["id","name","email"]}'
+    adapter_service_settings='{"sql":"SELECT id, name, email FROM customers WHERE name = ?",…}'
 )
 
 # 4. Query it
@@ -120,20 +131,20 @@ service_invoke("myapp.services:getCustomers", '{"getCustomersInput":{"name":"Ali
 
 ## Documentation
 
-See [mcp-server/README.md](mcp-server/README.md) for full documentation including:
+See [mcp-server-rs/README.md](mcp-server-rs/README.md) for full documentation including:
 - All 39 tools with parameters
 - Complete `put_node` JSON format reference
 - Flow step types (INVOKE, MAP, BRANCH, LOOP, etc.)
 - WmPath format for field references
 - Adapter connection settings for JDBC, SAP, OPC
-- Adapter service and notification templates
-- All IS API endpoints used
+- Environment variable reference
 
 ## Requirements
 
-- Python 3.10+
 - webMethods Integration Server 11.x with HTTP access
 - IS admin credentials
+
+To build from source: Rust toolchain (`cargo`). The compiled binary has no runtime dependencies.
 
 ## License
 
