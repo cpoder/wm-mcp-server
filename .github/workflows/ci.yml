@@ -50,6 +50,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: actions-rust-lang/audit@v1
-        with:
-          working-directory: mcp-server-rs
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo install cargo-audit --locked
+      - run: cargo audit --file mcp-server-rs/Cargo.lock
