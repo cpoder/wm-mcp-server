@@ -75,21 +75,19 @@ Claude will use `package_create`, `folder_create`, `flow_service_create`, `put_n
 
 ## How it works
 
-The server communicates with webMethods IS through its built-in HTTP services:
+The server communicates with webMethods IS exclusively through its built-in HTTP admin services (`wm.server.ns`, `wm.art.dev`, `pub.art`):
 
 ```
 Claude Code ──MCP──> Python MCP Server ──HTTP/JSON──> webMethods IS (port 5555)
 ```
 
-The key technical discovery is that the IS `wm.server.ns/putNode` API accepts a **complete flow tree as JSON**, including nested step definitions. This was found by decompiling `wm-isclient.jar` (specifically the `FlowElement` class hierarchy) to understand the internal serialization format.
+Flow service creation leverages the `wm.server.ns/putNode` API, which accepts the full flow tree as JSON -- signatures, steps, and mappings in a single call. The JSON structure mirrors the internal `FlowElement` / `Values` serialization used by the IS runtime (same format consumed by `FlowElement.create(Values)` in `wm-isclient.jar`).
 
-This means a single HTTP POST can create a fully functional flow service with:
+A single `put_node` call can define a complete flow service including:
 - Input/output signatures
-- INVOKE steps (calling other services with input/output mappings)
-- MAP steps (setting, copying, deleting pipeline variables)
-- BRANCH steps (conditional logic with switch/case)
-- LOOP steps (iterating over arrays)
-- SEQUENCE, EXIT, and more
+- INVOKE steps with input/output pipeline mappings
+- MAP, BRANCH, LOOP, SEQUENCE, EXIT steps
+- Nested step hierarchies of arbitrary depth
 
 ## Example: JDBC adapter querying SQL Server
 

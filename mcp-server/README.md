@@ -17,7 +17,7 @@ Claude Code / AI Assistant
     (any host, port 5555)
 ```
 
-All operations use IS built-in HTTP services (`wm.server.*`, `pub.art.*`, `wm.art.dev.*`). The key discovery enabling full remote flow service creation is that `wm.server.ns/putNode` accepts a complete flow tree as JSON, including nested step definitions (INVOKE, MAP, BRANCH, LOOP, etc.).
+All operations use IS built-in HTTP services (`wm.server.*`, `pub.art.*`, `wm.art.dev.*`). Flow service creation leverages `wm.server.ns/putNode`, which accepts the full flow tree as JSON -- the same `FlowElement` / `Values` serialization format used internally by the IS runtime.
 
 ## Setup
 
@@ -449,8 +449,8 @@ Use `adapter_connection_metadata(adapter_type, factory)` to discover the exact p
 - **Java services:** Only flow services can be fully created via API. Java services require IS-level compilation.
 - **Adapter service configuration:** Complex adapter services (e.g., JDBC Select) require many metadata parameters. Use `CustomSQL` for simpler setup, or `adapter_connection_metadata` to discover parameters.
 
-## Technical Background
+## Technical Notes
 
-The JSON format for `put_node` was reverse-engineered by decompiling `wm-isclient.jar` using [CFR](https://github.com/leibnitz27/cfr). Key classes: `FlowElement`, `FlowRoot`, `FlowInvoke`, `FlowBranch`, `FlowLoop`, `FlowMap`, `FlowMapSet`, `FlowMapCopy`, `NSSignature`, `NSRecord`, `NSField`.
+The `put_node` JSON format mirrors the `FlowElement` / `Values` serialization used internally by the IS runtime (`wm-isclient.jar`). Key classes: `FlowElement`, `FlowRoot`, `FlowInvoke`, `FlowBranch`, `FlowLoop`, `FlowMap`, `FlowMapSet`, `FlowMapCopy`, `NSSignature`, `NSRecord`, `NSField`.
 
-The `FlowElement.setValues(Values)` method reads the `nodes` key as an array of Values objects, recursively creating child FlowElement instances. MAP nodes with `mode=INPUT`/`OUTPUT` inside a non-ROOT parent are automatically assigned as that parent's input/output maps.
+`FlowElement.setValues(Values)` reads the `nodes` key as an array of Values objects and recursively instantiates child elements via its factory. MAP nodes with `mode=INPUT`/`OUTPUT` inside a non-ROOT parent are automatically assigned as that parent's input/output maps.
