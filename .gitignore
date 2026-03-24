@@ -1,0 +1,25 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE
+.vscode/
+.idea/
+
+# Claude Code local settings
+.claude/
+
+# Decompiler
+cfr.jar
+
+# Test files
+mcp-server/test_*.py
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env files with secrets
+.env

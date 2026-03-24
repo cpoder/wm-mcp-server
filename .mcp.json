@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "webmethods-is": {
+      "command": "/home/cpo/wm-claude/venv/bin/python",
+      "args": ["/home/cpo/wm-claude/mcp-server/server.py"],
+      "env": {
+        "PYTHONPATH": "/home/cpo/wm-claude/mcp-server",
+        "WM_IS_URL": "http://localhost:5555",
+        "WM_IS_USER": "Administrator",
+        "WM_IS_PASSWORD": "manage"
+      }
+    }
+  }
+}
