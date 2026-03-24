@@ -1,5 +1,7 @@
 # webMethods Integration Server MCP Server
 
+[![CI](https://github.com/cpoder/wm-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/cpoder/wm-mcp-server/actions/workflows/ci.yml)
+
 An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that gives AI assistants full control over [webMethods Integration Server](https://www.ibm.com/docs/en/webmethods-integration/wm-integration-server/11.1.0) through **pure HTTP APIs**. Single binary, no runtime dependencies. Works with any remote IS instance.
 
 Compatible with any [MCP client](https://modelcontextprotocol.io/) (IBM Bob, Claude Code, Claude Desktop, Cursor, Windsurf, etc.).

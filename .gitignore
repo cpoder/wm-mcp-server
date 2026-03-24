@@ -1,8 +1,5 @@
-# Python
-venv/
-__pycache__/
-*.pyc
-*.pyo
+# Rust
+target/
 
 # IDE
 .vscode/
@@ -10,12 +7,6 @@ __pycache__/
 
 # Claude Code local settings
 .claude/
-
-# Decompiler
-cfr.jar
-
-# Test files
-mcp-server/test_*.py
 
 # OS
 .DS_Store
