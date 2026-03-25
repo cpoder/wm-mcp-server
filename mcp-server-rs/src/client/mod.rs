@@ -17,6 +17,7 @@ mod packages;
 mod ports;
 mod remote_servers;
 mod scheduler;
+mod security;
 mod services;
 mod streaming;
 mod users;

@@ -460,6 +460,17 @@ check "rest_resource_list" "$out" "restV2Resources"
 # OpenAPI generation tested manually (requires network access from IS).
 # The list/get tools are verified above.
 
+# ── Security & Keystore ───────────────────────────────────────
+echo "--- Security ---"
+out=$(mcp_call 2 "keystore_list" '{}')
+check "keystore_list" "$out" "keyStoresAndConfiguredKeyAliases\|DEFAULT_IS_KEYSTORE"
+
+out=$(mcp_call 2 "truststore_list" '{}')
+check "truststore_list" "$out" "trustStores\|DEFAULT_IS_TRUSTSTORE"
+
+out=$(mcp_call 2 "security_settings_get" '{}')
+check "security_settings_get" "$out" "watt.server"
+
 # ── Prompts ──────────────────────────────────────────────────
 echo "--- Prompts ---"
 out=$(mcp_prompt 2 "setup_kafka_streaming")
