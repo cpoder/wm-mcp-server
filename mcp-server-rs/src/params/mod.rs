@@ -6,6 +6,7 @@ pub mod mqtt;
 pub mod namespace;
 pub mod packages;
 pub mod ports;
+pub mod scheduler;
 pub mod services;
 pub mod streaming;
 
@@ -17,5 +18,6 @@ pub use mqtt::*;
 pub use namespace::*;
 pub use packages::*;
 pub use ports::*;
+pub use scheduler::*;
 pub use services::*;
 pub use streaming::*;

@@ -237,6 +237,44 @@ check "mqtt_connection_disable" "$out" "disabled\|E2E_MQTT_Test"
 out=$(mcp_call 2 "mqtt_connection_delete" '{"alias_name":"E2E_MQTT_Test"}')
 check "mqtt_connection_delete" "$out" "deleted\|E2E_MQTT_Test"
 
+# ── Scheduler (full lifecycle) ────────────────────────────────
+echo "--- Scheduler ---"
+out=$(mcp_call 2 "scheduler_state" '{}')
+check "scheduler_state" "$out" "running"
+
+out=$(mcp_call 2 "scheduler_task_list" '{}')
+check "scheduler_task_list" "$out" "tasks"
+
+# Create a repeating task -> get -> suspend -> resume -> cancel
+SCHED_SETTINGS='{"service":"pub.flow:debugLog","description":"E2E scheduler test","type":"repeat","target":"$any","interval":"300000","startDate":"06/15/2027","startTime":"12:00:00"}'
+out=$(mcp_call 2 "scheduler_task_add" "{\"settings\":$(echo "$SCHED_SETTINGS" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read().strip()))')}")
+check "scheduler_task_add" "$out" "oid\|Task added"
+TASK_OID=$(echo "$out" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('oid',''))" 2>/dev/null)
+
+if [ -n "$TASK_OID" ]; then
+  out=$(mcp_call 2 "scheduler_task_get" "{\"oid\":\"$TASK_OID\"}")
+  check "scheduler_task_get" "$out" "pub.flow:debugLog\|E2E scheduler"
+
+  out=$(mcp_call 2 "scheduler_task_suspend" "{\"oid\":\"$TASK_OID\"}")
+  check "scheduler_task_suspend" "$out" "taskSuspended\|true"
+
+  out=$(mcp_call 2 "scheduler_task_resume" "{\"oid\":\"$TASK_OID\"}")
+  check "scheduler_task_resume" "$out" "taskResumed\|true"
+
+  out=$(mcp_call 2 "scheduler_task_cancel" "{\"oid\":\"$TASK_OID\"}")
+  check "scheduler_task_cancel" "$out" "taskCancelled\|true"
+else
+  echo "  SKIP: could not extract task OID"
+  SKIP=$((SKIP + 4))
+fi
+
+# Pause/resume scheduler
+out=$(mcp_call 2 "scheduler_pause" '{}')
+check "scheduler_pause" "$out" "paused\|message\|status"
+
+out=$(mcp_call 2 "scheduler_resume" '{}')
+check "scheduler_resume" "$out" "resumed\|message\|status"
+
 # ── Prompts ──────────────────────────────────────────────────
 echo "--- Prompts ---"
 out=$(mcp_prompt 2 "setup_kafka_streaming")

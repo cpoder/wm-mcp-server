@@ -1439,6 +1439,140 @@ impl WmServer {
         }
     }
 
+    // ── Scheduler ───────────────────────────────────────────────────────
+
+    #[tool(description = "Get the current scheduler state (running/paused).")]
+    async fn scheduler_state(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.scheduler_state().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "List all scheduled tasks with their status, schedule, and next run time."
+    )]
+    async fn scheduler_task_list(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.scheduler_task_list().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Add a scheduled task.\n\nRequired settings: service (full path e.g. \"mypkg.services:myService\"), description, type (\"once\"/\"repeat\"/\"complex\"), target (\"$any\" or specific server).\nFor once: startDate (MM/dd/yyyy), startTime (HH:mm:ss).\nFor repeat: interval (milliseconds), startDate, startTime.\nOptional: endDate, endTime, inputs (JSON string of service input params).\n\nReturns the task OID on success."
+    )]
+    async fn scheduler_task_add(
+        &self,
+        Parameters(p): Parameters<SchedulerTaskAddParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let settings = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.scheduler_task_add(&settings).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Get details of a scheduled task by its OID.")]
+    async fn scheduler_task_get(
+        &self,
+        Parameters(p): Parameters<SchedulerTaskOidParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.scheduler_task_get(&p.oid).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Update a scheduled task's settings.")]
+    async fn scheduler_task_update(
+        &self,
+        Parameters(p): Parameters<SchedulerTaskUpdateParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let settings = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.scheduler_task_update(&p.oid, &settings).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Cancel (delete) a scheduled task by its OID.")]
+    async fn scheduler_task_cancel(
+        &self,
+        Parameters(p): Parameters<SchedulerTaskOidParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.scheduler_task_cancel(&p.oid).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Suspend a scheduled task (pauses execution, keeps schedule).")]
+    async fn scheduler_task_suspend(
+        &self,
+        Parameters(p): Parameters<SchedulerTaskOidParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.scheduler_task_suspend(&p.oid).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Resume a suspended scheduled task.")]
+    async fn scheduler_task_resume(
+        &self,
+        Parameters(p): Parameters<SchedulerTaskOidParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.scheduler_task_resume(&p.oid).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Pause the entire scheduler (no tasks will execute until resumed).")]
+    async fn scheduler_pause(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.scheduler_pause().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Resume the scheduler after it was paused.")]
+    async fn scheduler_resume(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.scheduler_resume().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────
 
     #[tool(
