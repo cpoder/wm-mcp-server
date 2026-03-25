@@ -1,68 +1,70 @@
 # webMethods Integration Server MCP Server
 
 [![CI](https://github.com/cpoder/wm-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/cpoder/wm-mcp-server/actions/workflows/ci.yml)
+[![crates.io](https://img.shields.io/crates/v/wm-mcp-server.svg)](https://crates.io/crates/wm-mcp-server)
 
-An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that gives AI assistants full control over [webMethods Integration Server](https://www.ibm.com/docs/en/webmethods-integration/wm-integration-server/11.1.0) through **pure HTTP APIs**. Single binary, no runtime dependencies. Works with any remote IS instance.
+An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that gives AI assistants full control over [webMethods Integration Server](https://www.ibm.com/docs/en/webmethods-integration/wm-integration-server/11.1.0) -- replacing webMethods Designer for most development and administration tasks.
 
-Compatible with any [MCP client](https://modelcontextprotocol.io/) (IBM Bob, Claude Code, Claude Desktop, Cursor, Windsurf, etc.).
+Single ~4MB binary, no runtime dependencies, works with any remote IS instance via pure HTTP APIs.
+
+Compatible with any MCP client: [IBM Bob](https://www.ibm.com/products/bob), [Claude Code](https://claude.ai/claude-code), Claude Desktop, Cursor, Windsurf, etc.
 
 ## What can it do?
 
-| Capability | Examples |
+| Area | What the AI can do | Tools |
+|---|---|---|
+| **Flow services** | Create services with full logic (INVOKE, MAP, BRANCH, LOOP), signatures, test them | 5 |
+| **Adapter services** | Browse database tables/columns interactively, create Select/Insert/CustomSQL services -- like Designer | 5 |
+| **JDBC/SAP/OPC adapters** | Create connections, listeners, notifications, query metadata | 20 |
+| **Kafka streaming** | Create Kafka connections, event specifications, triggers | 15 |
+| **JMS messaging** | Create JMS connections and triggers via JNDI providers | 14 |
+| **MQTT messaging** | Create MQTT connections and triggers | 12 |
+| **Scheduler** | Create/manage scheduled tasks (one-time, repeating, complex) | 10 |
+| **Users & security** | Create users/groups, manage ACLs, keystores, OAuth clients | 24 |
+| **Server admin** | Health, stats, thread dumps, logs, extended settings, license info | 11 |
+| **Packages & namespace** | Full CRUD on packages, folders, nodes, document types | 10 |
+| **Ports** | HTTP/FTP/FilePolling/WebSocket listener management | 8 |
+| **JDBC pools** | Connection pool CRUD, driver management | 8 |
+| **Global variables** | Configuration variable management | 5 |
+| **Remote servers** | IS-to-IS remote server aliases | 4 |
+| **Web services** | REST/SOAP endpoints, OpenAPI generation | 8 |
+| **Auditing** | Audit logger management | 5 |
+
+**167 tools + 9 interactive prompts** in total.
+
+### Interactive setup wizards (prompts)
+
+The AI can guide you step-by-step through setting up:
+
+| Prompt | What it does |
 |---|---|
-| **Flow services** | Create services with full logic (INVOKE, MAP, BRANCH, LOOP), set input/output signatures, test them -- all in one API call |
-| **Packages** | Create, reload, enable, disable |
-| **Ports** | Manage HTTP, FTP, FTPS, FilePolling, Email, WebSocket listeners |
-| **JDBC adapters** | Connect to databases (SQL Server, PostgreSQL, Oracle, ...), create CustomSQL / Select / Insert services, configure polling notifications |
-| **SAP adapters** | Create SAP connections, RFC listeners, IDoc notifications |
-| **OPC UA adapters** | Create OPC connections, subscription listeners |
-| **Server admin** | Check status, shutdown, restart |
-
-### 40 tools across 8 categories
-
-```
-Instances       list_instances
-Server          is_status, is_shutdown
-Packages        package_list, package_create, package_reload, package_enable, package_disable
-Namespace       node_list, node_get, node_delete, folder_create
-Services        flow_service_create, put_node, service_invoke, mapset_value, document_type_create
-Ports           port_list, port_factory_list, port_get, port_add, port_update, port_enable, port_disable, port_delete
-Adapters        adapter_type_list, adapter_connection_metadata, adapter_connection_list,
-                adapter_connection_create, adapter_connection_enable, adapter_connection_disable,
-                adapter_connection_state, adapter_service_create, adapter_listener_list,
-                adapter_listener_create, adapter_listener_enable, adapter_listener_disable,
-                adapter_notification_list, adapter_notification_create_polling,
-                adapter_notification_create_listener_based
-```
-
-Supports **multiple IS instances** -- configure via a JSON file and pass `instance` to any tool to target a specific server.
+| `setup_jdbc_connection` | Walks through JDBC connection + adapter service creation, browses tables/columns interactively |
+| `setup_kafka_streaming` | Sets up Kafka connection alias + event specification |
+| `setup_jms_connection` | Creates JNDI provider + JMS connection (guides JAR installation) |
+| `setup_mqtt_connection` | Sets up MQTT connection + trigger subscription |
+| `setup_sap_connection` | Configures SAP adapter connection |
+| `setup_scheduled_task` | Schedules a service for execution |
+| `setup_rest_api` | Exposes services via OpenAPI or imports an API spec |
+| `setup_user_management` | Creates users, groups, ACLs |
+| `setup_oauth` | Registers OAuth clients and scopes |
 
 ## Quick Start
 
 ### 1. Install
 
-**Option A: cargo install (from source)**
-
 ```bash
-cargo install --git https://github.com/cpoder/wm-mcp-server.git
+# From crates.io
+cargo install wm-mcp-server
+
+# Or download a pre-built binary from Releases
+# https://github.com/cpoder/wm-mcp-server/releases
 ```
 
-**Option B: build locally**
+Binaries available for: Linux (x86_64, aarch64), macOS (x86_64, Apple Silicon), Windows (x86_64).
 
-```bash
-git clone https://github.com/cpoder/wm-mcp-server.git
-cd wm-mcp-server/mcp-server-rs
-cargo build --release
-# Binary at target/release/wm-mcp-server
-```
+### 2. Configure your MCP client
 
-**Option C: download pre-built binary**
-
-Download from [Releases](https://github.com/cpoder/wm-mcp-server/releases) and place in your PATH.
-
-### 2. Configure
-
-Create `.mcp.json` in your project directory:
+Add to `.mcp.json` in your project directory:
 
 ```json
 {
@@ -72,97 +74,76 @@ Create `.mcp.json` in your project directory:
       "env": {
         "WM_IS_URL": "http://your-is-host:5555",
         "WM_IS_USER": "Administrator",
-        "WM_IS_PASSWORD": "manage"
+        "WM_IS_PASSWORD": "your-password"
       }
     }
   }
 }
 ```
 
-For **multiple instances**, use a config file instead (see [mcp-server-rs/README.md](mcp-server-rs/README.md#multiple-instances-config-file)):
+#### Multiple IS instances
+
+Create a config file (e.g., `wm-instances.json`):
+
+```json
+{
+  "instances": {
+    "dev": { "url": "http://dev-host:5555", "user": "Administrator", "password": "manage" },
+    "prod": { "url": "http://prod-host:5555", "user": "Administrator", "password": "secret", "timeout": 60 }
+  },
+  "default": "dev"
+}
+```
 
 ```json
 {
   "mcpServers": {
     "webmethods-is": {
       "command": "wm-mcp-server",
-      "env": {
-        "WM_CONFIG": "/path/to/wm-instances.json"
-      }
+      "env": { "WM_CONFIG": "/path/to/wm-instances.json" }
     }
   }
 }
 ```
 
+Every tool accepts an optional `instance` parameter. Use `list_instances` to see what's configured.
+
 ### 3. Use
 
-Ask your AI assistant to create a flow service:
+**Natural language examples:**
 
-> "Create a flow service in package MyDemo that takes a name as input, calls pub.string:concat to build a greeting, and returns it."
+> "Create a flow service that greets the user by name"
 
-The assistant will use `package_create`, `folder_create`, `flow_service_create`, `put_node`, and `service_invoke` to build and test the service automatically.
+The AI creates the package, folders, service with full flow logic, and tests it.
+
+> "Set up a JDBC connection to my SQL Server database and create a Select service for the orders table"
+
+The AI uses the `setup_jdbc_connection` prompt to walk you through credentials, then browses your database tables/columns interactively (like Designer) to build the adapter service.
+
+> "Schedule pub.flow:debugLog to run every 5 minutes"
+
+The AI uses `scheduler_task_add` with a repeating interval.
+
+> "Create an MQTT connection to my Mosquitto broker and subscribe to sensor/temperature"
+
+The AI creates the connection, enables it, verifies connectivity, and sets up a trigger.
 
 ## How it works
 
-The server communicates with webMethods IS exclusively through its built-in HTTP admin services (`wm.server.ns`, `wm.art.dev`, `pub.art`):
-
 ```
-AI Assistant ──MCP (stdio)──> wm-mcp-server ──HTTP/JSON──> webMethods IS (port 5555)
+AI Assistant ──MCP (stdio)──> wm-mcp-server (Rust) ──HTTP/JSON──> webMethods IS (port 5555)
 ```
 
-Flow service creation leverages the `wm.server.ns/putNode` API, which accepts the full flow tree as JSON -- signatures, steps, and mappings in a single call. The JSON structure mirrors the internal `FlowElement` / `Values` serialization used by the IS runtime (same format consumed by `FlowElement.create(Values)` in `wm-isclient.jar`).
+All operations use IS built-in HTTP services. No filesystem access, no SSH, no agents on the IS host.
 
-A single `put_node` call can define a complete flow service including:
-- Input/output signatures
-- INVOKE steps with input/output pipeline mappings
-- MAP, BRANCH, LOOP, SEQUENCE, EXIT steps
-- Nested step hierarchies of arbitrary depth
-
-## Example: JDBC adapter querying SQL Server
-
-```
-# 1. Create a JDBC connection
-adapter_connection_create(
-    connection_alias="myapp.db:sqlserver",
-    package_name="MyApp",
-    adapter_type="JDBCAdapter",
-    connection_factory_type="com.wm.adapter.wmjdbc.connection.JDBCConnectionFactory",
-    connection_settings='{"transactionType":"NO_TRANSACTION","driverType":"Default","datasourceClass":"com.microsoft.sqlserver.jdbc.SQLServerDataSource","serverName":"localhost","user":"sa","password":"...","databaseName":"mydb","portNumber":"1433","otherProperties":"encrypt=false"}'
-)
-
-# 2. Enable it
-adapter_connection_enable("myapp.db:sqlserver")
-
-# 3. Create a CustomSQL service
-adapter_service_create(
-    service_name="myapp.services:getCustomers",
-    package_name="MyApp",
-    connection_alias="myapp.db:sqlserver",
-    service_template="com.wm.adapter.wmjdbc.services.CustomSQL",
-    adapter_service_settings='{"sql":"SELECT id, name, email FROM customers WHERE name = ?",…}'
-)
-
-# 4. Query it
-service_invoke("myapp.services:getCustomers", '{"getCustomersInput":{"name":"Alice"}}')
-# {"getCustomersOutput":{"results":[{"id":"1","name":"Alice","email":"alice@example.com"}]}}
-```
-
-## Documentation
-
-See [mcp-server-rs/README.md](mcp-server-rs/README.md) for full documentation including:
-- All 39 tools with parameters
-- Complete `put_node` JSON format reference
-- Flow step types (INVOKE, MAP, BRANCH, LOOP, etc.)
-- WmPath format for field references
-- Adapter connection settings for JDBC, SAP, OPC
-- Environment variable reference
+Flow services are created via `wm.server.ns/putNode` which accepts the full flow tree as JSON -- the same `FlowElement` / `Values` serialization used internally by the IS runtime.
 
 ## Requirements
 
-- webMethods Integration Server 11.x with HTTP access
-- IS admin credentials
-
-To build from source: Rust toolchain (`cargo`). The compiled binary has no runtime dependencies.
+- webMethods Integration Server 11.x with HTTP access enabled
+- IS admin credentials (Administrator or equivalent)
+- For JMS: provider client JARs in `WmART/code/jars/static/` + IS restart
+- For Kafka streaming: Kafka client JARs in `WmStreaming/code/jars/static/`
 
 ## License
 
