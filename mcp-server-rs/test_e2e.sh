@@ -88,6 +88,13 @@ check_not_empty() {
 echo "=== E2E Tests against live IS ==="
 echo ""
 
+# ── Clean Slate ──────────────────────────────────────────────
+echo "--- Clean Slate ---"
+# Wipe E2ETestPkg completely if it exists from a previous run
+curl -s -u Administrator:manage -H "Accept: application/json" \
+  "http://localhost:5555/invoke/wm.server.packages/packageDelete?package=E2ETestPkg" > /dev/null 2>&1 || true
+echo "  Done (deleted E2ETestPkg if it existed)"
+
 # ── Server Status ────────────────────────────────────────────
 echo "--- Server Status ---"
 out=$(mcp_call 2 "is_status" '{}')

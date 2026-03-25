@@ -1,10 +1,11 @@
+mod client;
 mod config;
-mod is_client;
+mod params;
 mod prompts;
 mod server;
 
+use client::ISClient;
 use config::AppConfig;
-use is_client::ISClient;
 use rmcp::{ServiceExt, transport::stdio};
 use server::WmServer;
 use std::collections::HashMap;
