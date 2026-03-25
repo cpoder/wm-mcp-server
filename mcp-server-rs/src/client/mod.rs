@@ -9,6 +9,7 @@ mod global_vars;
 mod jdbc_pools;
 mod jms;
 mod jndi;
+mod marketplace;
 mod monitoring;
 mod mqtt;
 mod namespace;

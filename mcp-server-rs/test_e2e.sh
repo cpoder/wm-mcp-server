@@ -518,6 +518,25 @@ check "url_alias_get" "$out" "e2etestalias\|urlPath"
 out=$(mcp_call 2 "url_alias_delete" '{"alias":"e2etestalias"}')
 check "url_alias_delete" "$out" "Deleted\|e2etestalias"
 
+# ── Package Marketplace (packages.webmethods.io) ────────────
+echo "--- Marketplace ---"
+out=$(mcp_call 2 "marketplace_registries" '{}')
+check "marketplace_registries" "$out" "registries\|public"
+
+out=$(mcp_call 2 "marketplace_categories" '{}')
+check "marketplace_categories" "$out" "categories\|utility"
+
+out=$(mcp_call 2 "marketplace_search" '{}')
+check "marketplace_search" "$out" "packages\|packageName"
+
+out=$(mcp_call 2 "marketplace_package_info" '{"package_name":"JcPublicTools"}')
+check "marketplace_package_info" "$out" "JcPublicTools\|description\|sourceUrl"
+
+# marketplace_package_tags tested manually (external HTTPS call can exceed mcp_call timeout)
+
+out=$(mcp_call 2 "marketplace_package_git" '{"package_name":"JcPublicTools"}')
+check "marketplace_package_git" "$out" "repoOwner\|html_url\|github"
+
 # ── Prompts ──────────────────────────────────────────────────
 echo "--- Prompts ---"
 for pname in setup_kafka_streaming setup_jdbc_connection setup_sap_connection setup_jms_connection setup_mqtt_connection setup_scheduled_task setup_rest_api setup_user_management setup_oauth; do

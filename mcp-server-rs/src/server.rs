@@ -2715,6 +2715,99 @@ impl WmServer {
         }
     }
 
+    // ── Package Marketplace (packages.webmethods.io) ─────────────────
+
+    #[tool(
+        description = "Search packages on the webMethods Package Registry (packages.webmethods.io).\n\nOptional filter by name substring and/or category. Returns package name, description, category, source URL."
+    )]
+    async fn marketplace_search(
+        &self,
+        Parameters(p): Parameters<MarketplaceSearchParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        // Marketplace doesn't need an IS instance - it's a public registry
+        let c = self.get_client(&None)?;
+        match c
+            .marketplace_search(
+                p.filter.as_deref(),
+                p.category.as_deref(),
+                p.registry.as_deref(),
+            )
+            .await
+        {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Get detailed information about a package on the registry (description, source URL, owner, etc.)."
+    )]
+    async fn marketplace_package_info(
+        &self,
+        Parameters(p): Parameters<MarketplacePackageParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&None)?;
+        match c
+            .marketplace_package_info(&p.package_name, p.registry.as_deref())
+            .await
+        {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "List available versions (tags) for a package on the registry.")]
+    async fn marketplace_package_tags(
+        &self,
+        Parameters(p): Parameters<MarketplacePackageParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&None)?;
+        match c
+            .marketplace_package_tags(&p.package_name, p.registry.as_deref())
+            .await
+        {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "List package categories available on the registry (utility, connector, example, etc.)."
+    )]
+    async fn marketplace_categories(&self) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&None)?;
+        match c.marketplace_categories(None).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "List available package registries (public, supported, etc.).")]
+    async fn marketplace_registries(&self) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&None)?;
+        match c.marketplace_registries().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Get git repository info for a package (GitHub URL, SSH URL, available tags).\n\nTo install a package: use the sourceUrl from the info to git clone into the IS packages directory, then use package_reload to activate it."
+    )]
+    async fn marketplace_package_git(
+        &self,
+        Parameters(p): Parameters<MarketplacePackageParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&None)?;
+        match c
+            .marketplace_package_git(&p.package_name, p.registry.as_deref())
+            .await
+        {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────
 
     #[tool(
