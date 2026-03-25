@@ -12,6 +12,7 @@ mod jndi;
 mod monitoring;
 mod mqtt;
 mod namespace;
+mod oauth;
 mod packages;
 mod ports;
 mod remote_servers;

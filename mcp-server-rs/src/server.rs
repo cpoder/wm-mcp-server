@@ -2182,6 +2182,132 @@ impl WmServer {
         }
     }
 
+    // ── OAuth Management ───────────────────────────────────────────────
+
+    #[tool(description = "Get OAuth server settings (HTTPS requirement, PKCE, token lifetimes).")]
+    async fn oauth_settings_get(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.oauth_settings_get().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Update OAuth server settings.")]
+    async fn oauth_settings_update(
+        &self,
+        Parameters(p): Parameters<OAuthSettingsUpdateParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let settings = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.oauth_settings_update(&settings).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "List all registered OAuth clients.")]
+    async fn oauth_client_list(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.oauth_client_list().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Register a new OAuth client.\n\nRequired settings: name, version, type (confidential/public).\nGrant types (set to \"true\"): authorization_code_allowed, implicit_allowed, client_credentials_allowed, owner_credentials_allowed.\nFor auth_code/implicit: redirect_uris is required.\nOptional: scopes, token_lifetime, enabled.\n\nReturns client_id and client_secret."
+    )]
+    async fn oauth_client_register(
+        &self,
+        Parameters(p): Parameters<OAuthClientRegisterParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let settings = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.oauth_client_register(&settings).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Remove a registered OAuth client by client_id.")]
+    async fn oauth_client_delete(
+        &self,
+        Parameters(p): Parameters<OAuthClientIdParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.oauth_client_delete(&p.client_id).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "List all OAuth scopes.")]
+    async fn oauth_scope_list(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.oauth_scope_list().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Add an OAuth scope.\n\nRequired settings: name, values (array of service paths or scope values). Optional: description."
+    )]
+    async fn oauth_scope_add(
+        &self,
+        Parameters(p): Parameters<OAuthScopeAddParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let settings = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.oauth_scope_add(&settings).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Remove an OAuth scope.")]
+    async fn oauth_scope_remove(
+        &self,
+        Parameters(p): Parameters<OAuthScopeNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.oauth_scope_remove(&p.name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "List all active OAuth access tokens.")]
+    async fn oauth_token_list(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.oauth_token_list().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────
 
     #[tool(

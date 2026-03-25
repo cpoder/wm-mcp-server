@@ -414,6 +414,38 @@ check "audit_logger_disable" "$out" "message\|disabled\|Error Logger"
 out=$(mcp_call 2 "audit_logger_enable" '{"logger_name":"Error Logger"}')
 check "audit_logger_enable" "$out" "message\|enabled\|Error Logger"
 
+# ── OAuth (full lifecycle) ────────────────────────────────────
+echo "--- OAuth ---"
+out=$(mcp_call 2 "oauth_settings_get" '{}')
+check "oauth_settings_get" "$out" "requireHTTPS\|accessTokenLifetime"
+
+out=$(mcp_call 2 "oauth_client_list" '{}')
+check "oauth_client_list" "$out" "clients"
+
+out=$(mcp_call 2 "oauth_scope_list" '{}')
+check_not_empty "oauth_scope_list" "$out"
+
+# Full lifecycle: register client -> add scope -> remove scope -> remove client
+OAUTH_CLIENT='{"name":"E2ETestClient","version":"1.0","type":"confidential","client_credentials_allowed":"true","enabled":"true"}'
+out=$(mcp_call 2 "oauth_client_register" "{\"settings\":$(echo "$OAUTH_CLIENT" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read().strip()))')}")
+check "oauth_client_register" "$out" "client_id\|client_secret"
+CLIENT_ID=$(echo "$out" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('client_id',''))" 2>/dev/null)
+
+OAUTH_SCOPE='{"name":"e2e_scope","description":"E2E test","values":["pub.flow:debugLog"]}'
+out=$(mcp_call 2 "oauth_scope_add" "{\"settings\":$(echo "$OAUTH_SCOPE" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read().strip()))')}")
+check "oauth_scope_add" "$out" "Saved\|e2e_scope"
+
+out=$(mcp_call 2 "oauth_scope_remove" '{"name":"e2e_scope"}')
+check "oauth_scope_remove" "$out" "Deleted\|e2e_scope"
+
+if [ -n "$CLIENT_ID" ]; then
+  out=$(mcp_call 2 "oauth_client_delete" "{\"client_id\":\"$CLIENT_ID\"}")
+  check "oauth_client_delete" "$out" "removed\|Successfully"
+else
+  echo "  SKIP: oauth_client_delete (no client_id)"
+  SKIP=$((SKIP + 1))
+fi
+
 # ── Prompts ──────────────────────────────────────────────────
 echo "--- Prompts ---"
 out=$(mcp_prompt 2 "setup_kafka_streaming")
