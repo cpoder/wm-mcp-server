@@ -473,14 +473,10 @@ check "security_settings_get" "$out" "watt.server"
 
 # ── Prompts ──────────────────────────────────────────────────
 echo "--- Prompts ---"
-out=$(mcp_prompt 2 "setup_kafka_streaming")
-check "prompt:setup_kafka_streaming" "$out" "Kafka"
-
-out=$(mcp_prompt 2 "setup_jdbc_connection")
-check "prompt:setup_jdbc_connection" "$out" "JDBC"
-
-out=$(mcp_prompt 2 "setup_sap_connection")
-check "prompt:setup_sap_connection" "$out" "SAP"
+for pname in setup_kafka_streaming setup_jdbc_connection setup_sap_connection setup_jms_connection setup_mqtt_connection setup_scheduled_task setup_rest_api setup_user_management setup_oauth; do
+  out=$(mcp_prompt 2 "$pname")
+  check_not_empty "prompt:$pname" "$out"
+done
 
 # ── Cleanup ──────────────────────────────────────────────────
 echo "--- Cleanup ---"

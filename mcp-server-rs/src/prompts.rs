@@ -2,39 +2,54 @@
 
 use rmcp::model::*;
 
+fn instance_arg() -> PromptArgument {
+    PromptArgument::new("instance")
+        .with_description("Target IS instance name (omit for default)")
+        .with_required(false)
+}
+
+fn prompt(name: &str, desc: &str) -> Prompt {
+    Prompt::new(name, Some(desc), Some(vec![instance_arg()]))
+}
+
 /// Build the list of all available prompts.
 pub fn list() -> Vec<Prompt> {
     vec![
-        Prompt::new(
+        prompt(
             "setup_kafka_streaming",
-            Some(
-                "Interactive setup wizard for a Kafka streaming connection alias, event specification, and trigger on webMethods IS.",
-            ),
-            Some(vec![
-                PromptArgument::new("instance")
-                    .with_description("Target IS instance name (omit for default)")
-                    .with_required(false),
-            ]),
+            "Interactive setup wizard for a Kafka streaming connection alias, event specification, and trigger.",
         ),
-        Prompt::new(
+        prompt(
             "setup_jdbc_connection",
-            Some(
-                "Interactive setup wizard for a JDBC adapter connection and adapter service on webMethods IS.",
-            ),
-            Some(vec![
-                PromptArgument::new("instance")
-                    .with_description("Target IS instance name (omit for default)")
-                    .with_required(false),
-            ]),
+            "Interactive setup wizard for a JDBC adapter connection and adapter service.",
         ),
-        Prompt::new(
+        prompt(
             "setup_sap_connection",
-            Some("Interactive setup wizard for an SAP adapter connection on webMethods IS."),
-            Some(vec![
-                PromptArgument::new("instance")
-                    .with_description("Target IS instance name (omit for default)")
-                    .with_required(false),
-            ]),
+            "Interactive setup wizard for an SAP adapter connection.",
+        ),
+        prompt(
+            "setup_jms_connection",
+            "Interactive setup wizard for a JMS connection alias with JNDI provider and trigger.",
+        ),
+        prompt(
+            "setup_mqtt_connection",
+            "Interactive setup wizard for an MQTT connection alias and trigger.",
+        ),
+        prompt(
+            "setup_scheduled_task",
+            "Interactive setup wizard to schedule a service for execution.",
+        ),
+        prompt(
+            "setup_rest_api",
+            "Interactive setup wizard to expose IS services as a REST API via OpenAPI.",
+        ),
+        prompt(
+            "setup_user_management",
+            "Interactive wizard to create users, groups, and configure access control.",
+        ),
+        prompt(
+            "setup_oauth",
+            "Interactive setup wizard for OAuth 2.0 client registration and scopes.",
         ),
     ]
 }
@@ -45,6 +60,12 @@ pub fn get(name: &str) -> Option<GetPromptResult> {
         "setup_kafka_streaming" => KAFKA_WIZARD,
         "setup_jdbc_connection" => JDBC_WIZARD,
         "setup_sap_connection" => SAP_WIZARD,
+        "setup_jms_connection" => JMS_WIZARD,
+        "setup_mqtt_connection" => MQTT_WIZARD,
+        "setup_scheduled_task" => SCHEDULER_WIZARD,
+        "setup_rest_api" => REST_API_WIZARD,
+        "setup_user_management" => USER_MGMT_WIZARD,
+        "setup_oauth" => OAUTH_WIZARD,
         _ => return None,
     };
 
@@ -137,3 +158,148 @@ and connection_factory_type=\"com.wm.adapter.sap.spi.SAPConnectionFactory\" to c
 then adapter_connection_enable to enable it.
 
 Then ask if I want to set up an **SAP listener** (for RFC or IDoc events).";
+
+const JMS_WIZARD: &str = "\
+Guide me through setting up a JMS connection on webMethods Integration Server. \
+Ask me for each of the following parameters one at a time.
+
+**Step 1: JNDI Provider** (required for third-party JMS providers like ActiveMQ, RabbitMQ)
+1. **JNDI alias name** -- identifier for the JNDI provider
+2. **Initial context factory** -- Java class name (e.g., org.apache.activemq.jndi.ActiveMQInitialContextFactory)
+3. **Provider URL** -- JNDI provider URL (e.g., tcp://activemq-host:61616)
+4. **Security principal** / **credentials** -- if authentication is needed
+
+IMPORTANT: The JMS provider's client JARs must be in IS classpath (WmART/code/jars/static/). \
+IS must be restarted after adding JARs. Tell the user this before proceeding.
+
+Use jndi_alias_set to create the JNDI alias, then jndi_test_lookup with lookupName=\"ConnectionFactory\" to verify.
+
+**Step 2: JMS Connection Alias**
+1. **Alias name** -- identifier for the JMS connection
+2. **JNDI alias** -- reference to the JNDI alias from step 1
+3. **Connection factory lookup name** -- typically \"ConnectionFactory\"
+4. **Client ID** -- unique client identifier
+5. **Transaction type** -- 0 (none), 1 (local), 2 (XA)
+
+Use jms_connection_create, then jms_connection_enable.
+
+**Step 3 (optional): JMS Trigger**
+Ask if the user wants to create a trigger to consume messages from a queue/topic.";
+
+const MQTT_WIZARD: &str = "\
+Guide me through setting up an MQTT connection on webMethods Integration Server. \
+Ask me for each of the following parameters one at a time.
+
+1. **Package name** -- which IS package should own this connection?
+2. **Alias name** -- identifier for the MQTT connection
+3. **Broker URL** -- MQTT broker address (e.g., tcp://mosquitto-host:1883, ssl://host:8883)
+4. **Client ID** -- unique MQTT client identifier
+5. **Username** / **Password** -- if broker requires authentication (optional)
+6. **Clean session** -- start with clean session (default: true)
+7. **Keep alive interval** -- seconds between pings (default: 60)
+8. **Connection timeout** -- seconds to wait for connection (default: 30)
+
+Use mqtt_connection_create to create, mqtt_connection_enable to connect.
+
+Then ask if the user wants to create a **trigger** to subscribe to an MQTT topic:
+1. **Trigger name** -- full namespace path (e.g., mypkg.triggers:mqttHandler)
+2. **Topic name** -- MQTT topic filter (supports +/# wildcards)
+3. **QoS** -- 0 (at most once), 1 (at least once), 2 (exactly once)
+4. **Service** -- flow service to invoke when a message arrives
+
+Use mqtt_trigger_create to create the trigger.";
+
+const SCHEDULER_WIZARD: &str = "\
+Guide me through scheduling a service for execution on webMethods Integration Server. \
+Ask me for each of the following parameters.
+
+1. **Service to schedule** -- full service path (e.g., mypkg.services:myService). List available services with node_list if needed.
+2. **Schedule type** -- one of:
+   - **once** -- run once at a specific date/time
+   - **repeat** -- run repeatedly at a fixed interval
+   - **complex** -- cron-like schedule
+3. **For once**: start date (MM/dd/yyyy) and start time (HH:mm:ss)
+4. **For repeat**: interval in milliseconds (e.g., 300000 for 5 minutes), start date/time, optional end date/time
+5. **Target** -- which server to run on (\"$any\" for any available server, or a specific server name)
+6. **Description** -- what this scheduled task does
+7. **Service inputs** -- JSON string of input parameters for the service (optional)
+
+Use scheduler_task_add to create the task. The response includes the task OID.
+Use scheduler_task_get to verify the task was created correctly.
+Use scheduler_task_list to see all scheduled tasks.";
+
+const REST_API_WIZARD: &str = "\
+Guide me through exposing IS services as a REST API on webMethods Integration Server.
+
+**Option A: Generate from existing services**
+1. List available services with node_list
+2. For each service to expose, verify its input/output signature with node_get
+3. The IS REST descriptor framework automatically maps services to REST endpoints
+
+**Option B: Import from OpenAPI specification**
+1. **Package name** -- which IS package should contain the generated services
+2. **Folder name** -- namespace folder for the generated artifacts
+3. **REST API descriptor name** -- identifier for this API
+4. **OpenAPI source** -- either a URL (sourceUri) or inline JSON/YAML content (openapiContent)
+5. **Group by tag** -- whether to organize services by OpenAPI tags (default: false)
+
+Use openapi_generate_provider to generate IS services from the spec, or \
+openapi_generate_consumer to generate client connectors for calling an external API.
+
+Use rest_resource_list to see all REST API descriptors, and \
+openapi_doc_get to retrieve the generated OpenAPI document.";
+
+const USER_MGMT_WIZARD: &str = "\
+Guide me through setting up users and access control on webMethods Integration Server. \
+Ask me what I need to do:
+
+**Create a user:**
+1. **Username** -- ASCII letters and digits only
+2. **Password** -- initial password
+Use user_add to create, then optionally add to groups.
+
+**Create a group:**
+1. **Group name** -- identifier for the group
+Use group_add to create. Then use group_change to set members.
+
+**View current configuration:**
+- user_list -- show all users and their group memberships
+- group_list -- show all groups and their members
+- acl_list -- show all ACLs with allow/deny groups
+- account_locking_get -- show account locking policy
+
+**Manage access:**
+- acl_add -- create a new ACL with allow/deny group lists
+- user_set_disabled -- enable or disable a user account
+
+Ask me which of these operations I need.";
+
+const OAUTH_WIZARD: &str = "\
+Guide me through setting up OAuth 2.0 on webMethods Integration Server. \
+Ask me what I need:
+
+**Register an OAuth client:**
+1. **Client name** and **version**
+2. **Client type** -- confidential (server-side app) or public (SPA/mobile)
+3. **Grant types** -- which OAuth flows to allow:
+   - client_credentials (machine-to-machine, most common for APIs)
+   - authorization_code (interactive login with redirect)
+   - implicit (legacy browser flow)
+   - owner_credentials (direct username/password)
+4. **Redirect URIs** -- required for authorization_code and implicit grants
+5. **Enabled** -- whether the client is active
+
+Use oauth_client_register. It returns the client_id and client_secret -- tell the user to save these securely.
+
+**Create an OAuth scope:**
+1. **Scope name** -- identifier (e.g., \"read\", \"admin\")
+2. **Description** -- what the scope grants access to
+3. **Values** -- array of IS service paths that this scope authorizes
+
+Use oauth_scope_add.
+
+**View current configuration:**
+- oauth_settings_get -- show OAuth server settings
+- oauth_client_list -- show all registered clients
+- oauth_scope_list -- show all scopes
+- oauth_token_list -- show active access tokens";
