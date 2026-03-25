@@ -13,6 +13,7 @@ mod mqtt;
 mod namespace;
 mod packages;
 mod ports;
+mod remote_servers;
 mod scheduler;
 mod services;
 mod streaming;

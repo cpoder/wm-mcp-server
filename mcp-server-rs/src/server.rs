@@ -2060,6 +2060,62 @@ impl WmServer {
         }
     }
 
+    // ── Remote Server Aliases ──────────────────────────────────────────
+
+    #[tool(description = "List all remote server aliases (for IS-to-IS communication).")]
+    async fn remote_server_list(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.remote_server_list().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Add a remote server alias for IS-to-IS communication.\n\nRequired settings: alias (name), host, port, user, pass.\nOptional: ssl (yes/no), acl, keepalive (seconds), timeout (seconds)."
+    )]
+    async fn remote_server_add(
+        &self,
+        Parameters(p): Parameters<RemoteServerAddParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let settings = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.remote_server_add(&settings).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Delete a remote server alias.")]
+    async fn remote_server_delete(
+        &self,
+        Parameters(p): Parameters<RemoteServerAliasParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.remote_server_delete(&p.alias).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Test connectivity to a remote server alias.")]
+    async fn remote_server_test(
+        &self,
+        Parameters(p): Parameters<RemoteServerAliasParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.remote_server_test(&p.alias).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────
 
     #[tool(

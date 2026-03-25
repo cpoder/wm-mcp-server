@@ -383,6 +383,22 @@ check "server_license_info" "$out" "LicenseInfo\|Clustering"
 out=$(mcp_call 2 "server_circuit_breaker_stats" '{}')
 check_not_empty "server_circuit_breaker_stats" "$out"
 
+# ── Remote Server Aliases (full lifecycle) ────────────────────
+echo "--- Remote Servers ---"
+out=$(mcp_call 2 "remote_server_list" '{}')
+check "remote_server_list" "$out" "servers\|local"
+
+# Full lifecycle: add -> test connectivity -> delete
+REMOTE_SETTINGS='{"alias":"E2ERemoteTest","host":"localhost","port":"5555","user":"Administrator","pass":"manage"}'
+out=$(mcp_call 2 "remote_server_add" "{\"settings\":$(echo "$REMOTE_SETTINGS" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read().strip()))')}")
+check "remote_server_add" "$out" "E2ERemoteTest\|servers"
+
+out=$(mcp_call 2 "remote_server_test" '{"alias":"E2ERemoteTest"}')
+check "remote_server_test" "$out" "success\|Connected"
+
+out=$(mcp_call 2 "remote_server_delete" '{"alias":"E2ERemoteTest"}')
+check "remote_server_delete" "$out" "servers\|E2ERemoteTest"
+
 # ── Prompts ──────────────────────────────────────────────────
 echo "--- Prompts ---"
 out=$(mcp_prompt 2 "setup_kafka_streaming")
