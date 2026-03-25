@@ -311,6 +311,28 @@ check "group_delete" "$out" "success.*true\|Deleted"
 out=$(mcp_call 2 "user_delete" '{"username":"e2etestuser"}')
 check "user_delete" "$out" "success.*true\|Deleted"
 
+# ── JDBC Pools (full lifecycle) ───────────────────────────────
+echo "--- JDBC Pools ---"
+out=$(mcp_call 2 "jdbc_pool_list" '{}')
+check "jdbc_pool_list" "$out" "pools\|pool.name"
+
+out=$(mcp_call 2 "jdbc_driver_list" '{}')
+check "jdbc_driver_list" "$out" "drivers\|driver.name"
+
+out=$(mcp_call 2 "jdbc_function_list" '{}')
+check "jdbc_function_list" "$out" "functions\|function.name"
+
+# Create -> test -> delete cycle
+POOL_SETTINGS='{"pool":"E2ETestPool","description":"E2E test pool","drivers":"DataDirect Connect JDBC SQL Server Driver","url":"jdbc:wm:sqlserver://localhost:1433;databaseName=master","uid":"sa","pwd":"TestPass","mincon":"1","maxcon":"3"}'
+out=$(mcp_call 2 "jdbc_pool_add" "{\"settings\":$(echo "$POOL_SETTINGS" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read().strip()))')}")
+check "jdbc_pool_add" "$out" "E2ETestPool\|funct\|Add"
+
+out=$(mcp_call 2 "jdbc_pool_test" "{\"settings\":$(echo "$POOL_SETTINGS" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read().strip()))')}")
+check "jdbc_pool_test" "$out" "E2ETestPool\|message"
+
+out=$(mcp_call 2 "jdbc_pool_delete" '{"pool":"E2ETestPool"}')
+check "jdbc_pool_delete" "$out" "deleted\|E2ETestPool"
+
 # ── Prompts ──────────────────────────────────────────────────
 echo "--- Prompts ---"
 out=$(mcp_prompt 2 "setup_kafka_streaming")

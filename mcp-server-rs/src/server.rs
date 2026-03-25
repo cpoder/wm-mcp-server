@@ -1745,6 +1745,122 @@ impl WmServer {
         }
     }
 
+    // ── JDBC Connection Pools ──────────────────────────────────────────
+
+    #[tool(description = "List all JDBC connection pools with their driver and description.")]
+    async fn jdbc_pool_list(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.jdbc_pool_list().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Create a JDBC connection pool.\n\nRequired settings: pool (name), drivers (driver alias from jdbc_driver_list), url (JDBC URL), uid (username), pwd (password).\nOptional: description, mincon, maxcon, idle (timeout).\n\nCommon JDBC URL formats:\n- SQL Server: jdbc:wm:sqlserver://host:1433;databaseName=mydb\n- PostgreSQL: jdbc:wm:postgresql://host:5432;databaseName=mydb\n- Oracle: jdbc:wm:oracle://host:1521;serviceName=mydb"
+    )]
+    async fn jdbc_pool_add(
+        &self,
+        Parameters(p): Parameters<JdbcPoolAddParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let settings = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.jdbc_pool_add(&settings).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Update a JDBC connection pool's settings.")]
+    async fn jdbc_pool_update(
+        &self,
+        Parameters(p): Parameters<JdbcPoolAddParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let settings = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.jdbc_pool_update(&settings).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Delete a JDBC connection pool.")]
+    async fn jdbc_pool_delete(
+        &self,
+        Parameters(p): Parameters<JdbcPoolNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.jdbc_pool_delete(&p.pool).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Test a JDBC connection pool.\n\nPass the same settings as jdbc_pool_add to test the connection."
+    )]
+    async fn jdbc_pool_test(
+        &self,
+        Parameters(p): Parameters<JdbcPoolTestParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let settings = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.jdbc_pool_test(&settings).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Restart a JDBC connection pool (close and reopen all connections).")]
+    async fn jdbc_pool_restart(
+        &self,
+        Parameters(p): Parameters<JdbcPoolNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.jdbc_pool_restart(&p.pool).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "List all available JDBC driver aliases with their class names.")]
+    async fn jdbc_driver_list(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.jdbc_driver_list().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "List all JDBC functional aliases (logical names mapped to connection pools)."
+    )]
+    async fn jdbc_function_list(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.jdbc_function_list().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────
 
     #[tool(
