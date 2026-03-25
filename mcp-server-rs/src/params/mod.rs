@@ -1,4 +1,5 @@
 pub mod adapters;
+pub mod auditing;
 pub mod common;
 pub mod global_vars;
 pub mod jdbc_pools;
@@ -16,6 +17,7 @@ pub mod streaming;
 pub mod users;
 
 pub use adapters::*;
+pub use auditing::*;
 pub use common::*;
 pub use global_vars::*;
 pub use jdbc_pools::*;

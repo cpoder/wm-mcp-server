@@ -2116,6 +2116,72 @@ impl WmServer {
         }
     }
 
+    // ── Auditing ────────────────────────────────────────────────────────
+
+    #[tool(description = "List all audit loggers with their enabled/disabled status.")]
+    async fn audit_logger_list(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.audit_logger_list().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Get detailed configuration of an audit logger.")]
+    async fn audit_logger_get(
+        &self,
+        Parameters(p): Parameters<AuditLoggerNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.audit_logger_get(&p.logger_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Update audit logger settings (destination, async mode, etc.).")]
+    async fn audit_logger_update(
+        &self,
+        Parameters(p): Parameters<AuditLoggerUpdateParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let settings = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.audit_logger_update(&p.logger_name, &settings).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Enable an audit logger.")]
+    async fn audit_logger_enable(
+        &self,
+        Parameters(p): Parameters<AuditLoggerNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.audit_logger_enable(&p.logger_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Disable an audit logger.")]
+    async fn audit_logger_disable(
+        &self,
+        Parameters(p): Parameters<AuditLoggerNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.audit_logger_disable(&p.logger_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────
 
     #[tool(

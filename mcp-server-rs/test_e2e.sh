@@ -399,6 +399,21 @@ check "remote_server_test" "$out" "success\|Connected"
 out=$(mcp_call 2 "remote_server_delete" '{"alias":"E2ERemoteTest"}')
 check "remote_server_delete" "$out" "servers\|E2ERemoteTest"
 
+# ── Auditing ─────────────────────────────────────────────────
+echo "--- Auditing ---"
+out=$(mcp_call 2 "audit_logger_list" '{}')
+check "audit_logger_list" "$out" "loggers\|loggerName"
+
+out=$(mcp_call 2 "audit_logger_get" '{"logger_name":"Error Logger"}')
+check "audit_logger_get" "$out" "Error Logger\|isEnabled"
+
+# Disable then re-enable the Error Logger
+out=$(mcp_call 2 "audit_logger_disable" '{"logger_name":"Error Logger"}')
+check "audit_logger_disable" "$out" "message\|disabled\|Error Logger"
+
+out=$(mcp_call 2 "audit_logger_enable" '{"logger_name":"Error Logger"}')
+check "audit_logger_enable" "$out" "message\|enabled\|Error Logger"
+
 # ── Prompts ──────────────────────────────────────────────────
 echo "--- Prompts ---"
 out=$(mcp_prompt 2 "setup_kafka_streaming")
