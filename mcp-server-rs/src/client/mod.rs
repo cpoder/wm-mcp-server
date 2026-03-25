@@ -8,6 +8,7 @@ mod global_vars;
 mod jdbc_pools;
 mod jms;
 mod jndi;
+mod monitoring;
 mod mqtt;
 mod namespace;
 mod packages;

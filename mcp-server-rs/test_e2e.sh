@@ -353,6 +353,36 @@ check "global_var_get_updated" "$out" "updated_value"
 out=$(mcp_call 2 "global_var_remove" '{"key":"E2E_TEST_VAR"}')
 check "global_var_remove" "$out" "Success\|deleted"
 
+# ── Server Monitoring & Config ────────────────────────────────
+echo "--- Server Monitoring ---"
+out=$(mcp_call 2 "server_stats" '{}')
+check "server_stats_quick" "$out" "uptime"
+# server_health can be slow on large IS instances, tested via curl above
+
+out=$(mcp_call 2 "server_stats" '{}')
+check "server_stats" "$out" "uptime\|freeMem\|totalMem"
+
+out=$(mcp_call 2 "server_settings" '{}')
+check_not_empty "server_settings" "$out"
+
+out=$(mcp_call 2 "server_extended_settings" '{}')
+check "server_extended_settings" "$out" "watt\."
+
+out=$(mcp_call 2 "server_service_stats" '{}')
+check "server_service_stats" "$out" "SvcStats\|name"
+
+out=$(mcp_call 2 "server_thread_dump" '{}')
+check "server_thread_dump" "$out" "threadDump\|Thread"
+
+out=$(mcp_call 2 "server_session_list" '{}')
+check "server_session_list" "$out" "sessions\|ssnid"
+
+out=$(mcp_call 2 "server_license_info" '{}')
+check "server_license_info" "$out" "LicenseInfo\|Clustering"
+
+out=$(mcp_call 2 "server_circuit_breaker_stats" '{}')
+check_not_empty "server_circuit_breaker_stats" "$out"
+
 # ── Prompts ──────────────────────────────────────────────────
 echo "--- Prompts ---"
 out=$(mcp_prompt 2 "setup_kafka_streaming")
