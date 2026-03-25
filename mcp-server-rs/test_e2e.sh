@@ -446,6 +446,20 @@ else
   SKIP=$((SKIP + 1))
 fi
 
+# ── Web Services / REST / OpenAPI ─────────────────────────────
+echo "--- Web Services ---"
+out=$(mcp_call 2 "ws_provider_endpoint_list" '{}')
+check "ws_provider_endpoint_list" "$out" "endpoints"
+
+out=$(mcp_call 2 "ws_consumer_endpoint_list" '{}')
+check "ws_consumer_endpoint_list" "$out" "endpoints"
+
+out=$(mcp_call 2 "rest_resource_list" '{}')
+check "rest_resource_list" "$out" "restV2Resources"
+
+# OpenAPI generation tested manually (requires network access from IS).
+# The list/get tools are verified above.
+
 # ── Prompts ──────────────────────────────────────────────────
 echo "--- Prompts ---"
 out=$(mcp_prompt 2 "setup_kafka_streaming")

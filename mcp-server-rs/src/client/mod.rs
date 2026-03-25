@@ -20,6 +20,7 @@ mod scheduler;
 mod services;
 mod streaming;
 mod users;
+mod webservices;
 
 use reqwest::Client;
 use reqwest::header::{ACCEPT, AUTHORIZATION, HeaderMap, HeaderValue};

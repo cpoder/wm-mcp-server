@@ -35,3 +35,6 @@ pub use scheduler::*;
 pub use services::*;
 pub use streaming::*;
 pub use users::*;
+
+pub mod webservices;
+pub use webservices::*;

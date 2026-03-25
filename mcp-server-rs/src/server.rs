@@ -2308,6 +2308,120 @@ impl WmServer {
         }
     }
 
+    // ── Web Services / REST / OpenAPI ─────────────────────────────────
+
+    #[tool(description = "List all WS provider endpoints (SOAP web services exposed by IS).")]
+    async fn ws_provider_endpoint_list(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.ws_provider_endpoint_list().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "List all WS consumer endpoints (external SOAP services IS can call).")]
+    async fn ws_consumer_endpoint_list(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.ws_consumer_endpoint_list().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Get the WSDL document for a web service descriptor.")]
+    async fn ws_wsdl_get(
+        &self,
+        Parameters(p): Parameters<WsEndpointNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.ws_wsdl_get(&p.name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "List all REST API resources (REST descriptors) on the IS.")]
+    async fn rest_resource_list(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.rest_resource_list().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Get the OpenAPI document (JSON/YAML) for a REST API descriptor.")]
+    async fn openapi_doc_get(
+        &self,
+        Parameters(p): Parameters<OpenApiDocParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.openapi_doc_get(&p.rad_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Generate IS provider services from an OpenAPI specification.\n\nRequired settings: packageName, folderName, radName (output descriptor name).\nProvide either sourceUri (URL) or openapiContent (inline spec).\nOptional: isGroupByTag (true/false)."
+    )]
+    async fn openapi_generate_provider(
+        &self,
+        Parameters(p): Parameters<OpenApiGenerateParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let settings = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.openapi_generate_provider(&settings).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Generate IS consumer connectors from an OpenAPI specification.\n\nRequired settings: packageName, folderName, radName.\nProvide either sourceUri (URL) or openapiContent (inline spec)."
+    )]
+    async fn openapi_generate_consumer(
+        &self,
+        Parameters(p): Parameters<OpenApiGenerateParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let settings = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.openapi_generate_consumer(&settings).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Refresh a REST API provider descriptor from its OpenAPI source.")]
+    async fn openapi_refresh_provider(
+        &self,
+        Parameters(p): Parameters<OpenApiGenerateParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let settings = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.openapi_refresh_provider(&settings).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────
 
     #[tool(
