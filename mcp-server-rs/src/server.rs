@@ -376,6 +376,66 @@ pub struct StreamingTriggerNameParam {
     pub instance: Option<String>,
 }
 
+// ── Adapter metadata param structs ──────────────────────────────
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct AdapterServiceTemplateListParam {
+    #[schemars(description = "Adapter connection alias (e.g., \"mypkg.connections:sqlserver\")")]
+    pub connection_alias: String,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct AdapterServiceTemplateMetadataParam {
+    #[schemars(description = "Adapter connection alias")]
+    pub connection_alias: String,
+    #[schemars(
+        description = "Service template class (e.g., \"com.wm.adapter.wmjdbc.services.Select\")"
+    )]
+    pub service_template: String,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct AdapterResourceDomainLookupParam {
+    #[schemars(description = "Adapter connection alias")]
+    pub connection_alias: String,
+    #[schemars(description = "Service template class")]
+    pub service_template: String,
+    #[schemars(
+        description = "Resource domain name (e.g., \"catalogNames\", \"schemaNames\", \"tableNames\", \"columnInfo\")"
+    )]
+    pub resource_domain_name: String,
+    #[schemars(
+        description = "Dependent parameter values as a JSON array of strings. E.g., for tableNames: [\"catalogName\",\"schemaName\"]. For columnInfo: [\"catalog\",\"schema\",\"table\"]. Omit for top-level domains like catalogNames."
+    )]
+    pub values: Option<String>,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct AdapterServiceGetParam {
+    #[schemars(description = "Full adapter service name (e.g., \"mypkg.services:queryDb\")")]
+    pub service_name: String,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct AdapterServiceUpdateParam {
+    #[schemars(description = "Full adapter service name")]
+    pub service_name: String,
+    #[schemars(
+        description = "JSON string of settings to update (connectionAlias, adapterServiceSettings)"
+    )]
+    pub settings: String,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 // MCP Server
 // ═══════════════════════════════════════════════════════════════════════
@@ -1029,6 +1089,98 @@ impl WmServer {
             )
             .await
         {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    // ── Adapter Metadata (Designer-like) ─────────────────────────────
+
+    #[tool(
+        description = "List available adapter service templates for a connection.\n\nReturns the service types (Select, Insert, CustomSQL, etc.) that can be created for this connection."
+    )]
+    async fn adapter_service_template_list(
+        &self,
+        Parameters(p): Parameters<AdapterServiceTemplateListParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.adapter_service_template_list(&p.connection_alias).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Get detailed metadata for an adapter service template.\n\nReturns all configurable properties with their types, resource domains (for lookups), and defaults. Use this to understand what parameters are needed before creating a service."
+    )]
+    async fn adapter_service_template_metadata(
+        &self,
+        Parameters(p): Parameters<AdapterServiceTemplateMetadataParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c
+            .adapter_service_template_metadata(&p.connection_alias, &p.service_template)
+            .await
+        {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Look up valid values for an adapter resource domain from a live connection.\n\nThis is the key API for browsing database objects interactively -- like webMethods Designer does.\n\nCommon resource domains for JDBC Select:\n- \"catalogNames\" -- list database catalogs (no values needed)\n- \"schemaNames\" -- list schemas (values: [\"catalogName\"])\n- \"tableNames\" -- list tables (values: [\"catalogName\", \"schemaName\"])\n- \"tableTypes\" -- list table types (values: [\"catalogName\", \"schemaName\"])\n- \"columnInfo\" -- list columns (values: [\"catalogName\", \"schemaName\", \"tableName\"])\n- \"columnNames\" -- list column names for selection\n\nThe 'values' parameter provides dependent context values in order."
+    )]
+    async fn adapter_resource_domain_lookup(
+        &self,
+        Parameters(p): Parameters<AdapterResourceDomainLookupParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let values = match &p.values {
+            Some(s) => match parse_json(s) {
+                Ok(v) => Some(v),
+                Err(e) => return text_result(&e),
+            },
+            None => None,
+        };
+        match c
+            .adapter_resource_domain_lookup(
+                &p.connection_alias,
+                &p.service_template,
+                &p.resource_domain_name,
+                values.as_ref(),
+            )
+            .await
+        {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Get the current configuration of an existing adapter service.")]
+    async fn adapter_service_get(
+        &self,
+        Parameters(p): Parameters<AdapterServiceGetParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.adapter_service_get(&p.service_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Update an existing adapter service's configuration (connection, settings)."
+    )]
+    async fn adapter_service_update(
+        &self,
+        Parameters(p): Parameters<AdapterServiceUpdateParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let settings = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.adapter_service_update(&p.service_name, &settings).await {
             Ok(v) => json_result(&v),
             Err(e) => text_result(&format!("Failed: {e}")),
         }

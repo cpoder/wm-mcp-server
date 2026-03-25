@@ -105,7 +105,17 @@ After collecting all parameters, use adapter_connection_create with adapter_type
 and connection_factory_type=\"com.wm.adapter.wmjdbc.connection.JDBCConnectionFactory\" to create it, \
 then adapter_connection_enable to enable it.
 
-Then ask if I want to create an **adapter service** (CustomSQL query) for this connection.";
+Then ask if I want to create an **adapter service** for this connection. If yes:
+1. Use adapter_service_template_list to show available service types (Select, Insert, CustomSQL, etc.)
+2. Ask which type they want
+3. For Select/Insert/Update/Delete: use adapter_resource_domain_lookup to browse the database interactively:
+   a. List catalogs: resource_domain_name=\"catalogNames\"
+   b. List schemas: resource_domain_name=\"schemaNames\", values=[\"catalog\"]
+   c. List tables: resource_domain_name=\"tableNames\", values=[\"catalog\",\"schema\"]
+   d. List columns: resource_domain_name=\"columnInfo\", values=[\"catalog\",\"schema\",\"table\"]
+   Show the user the available tables and let them pick. Then show columns and let them pick.
+4. For CustomSQL: ask the user for the SQL query directly
+5. Create the service with adapter_service_create using the collected parameters";
 
 const SAP_WIZARD: &str = "\
 Guide me through setting up an SAP adapter connection on webMethods Integration Server. \

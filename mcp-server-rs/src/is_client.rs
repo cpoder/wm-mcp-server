@@ -818,6 +818,82 @@ impl ISClient {
         .await
     }
 
+    // ── Adapter Metadata (Designer-like) ─────────────────────────────
+
+    pub async fn adapter_service_template_list(
+        &self,
+        connection_alias: &str,
+    ) -> Result<Value, String> {
+        self.invoke_post(
+            "wm.art.ns:getAdapterServiceTemplateList",
+            &json!({"connectionAlias": connection_alias}),
+        )
+        .await
+    }
+
+    pub async fn adapter_service_template_metadata(
+        &self,
+        connection_alias: &str,
+        service_template: &str,
+    ) -> Result<Value, String> {
+        self.invoke_post(
+            "wm.art.dev.service:fetchAdapterServiceTemplateMetadata",
+            &json!({
+                "connectionAlias": connection_alias,
+                "serviceTemplate": service_template,
+            }),
+        )
+        .await
+    }
+
+    pub async fn adapter_resource_domain_lookup(
+        &self,
+        connection_alias: &str,
+        service_template: &str,
+        resource_domain_name: &str,
+        values: Option<&Value>,
+    ) -> Result<Value, String> {
+        let mut payload = json!({
+            "connectionAlias": connection_alias,
+            "serviceTemplate": service_template,
+            "resourceDomainName": resource_domain_name,
+        });
+        if let Some(v) = values {
+            payload
+                .as_object_mut()
+                .unwrap()
+                .insert("values".into(), v.clone());
+        }
+        self.invoke_post("wm.art.metadata:resourceDomainLookupValues", &payload)
+            .await
+    }
+
+    pub async fn adapter_service_get(&self, node_name: &str) -> Result<Value, String> {
+        self.invoke_post(
+            "wm.art.ns:queryAdapterServiceData",
+            &json!({"nodeName": node_name}),
+        )
+        .await
+    }
+
+    pub async fn adapter_service_update(
+        &self,
+        service_name: &str,
+        settings: &Value,
+    ) -> Result<Value, String> {
+        let mut payload = json!({"serviceName": service_name});
+        if let Some(obj) = settings.as_object() {
+            for (k, v) in obj {
+                payload
+                    .as_object_mut()
+                    .unwrap()
+                    .insert(k.clone(), v.clone());
+            }
+        }
+        self.invoke_post("wm.art.dev.service:updateAdapterServiceNode", &payload)
+            .await
+    }
+
     // ── Internal helpers ───────────────────────────────────────────────
 
     async fn invoke_get(&self, service: &str) -> Result<Value, String> {
