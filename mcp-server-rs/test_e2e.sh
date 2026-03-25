@@ -188,6 +188,22 @@ check_not_empty "streaming_trigger_list" "$out"
 out=$(mcp_call 2 "streaming_event_source_list" '{}')
 check_not_empty "streaming_event_source_list" "$out"
 
+# ── JMS Messaging ────────────────────────────────────────────
+echo "--- JMS Messaging ---"
+out=$(mcp_call 2 "jms_connection_list" '{}')
+check "jms_connection_list" "$out" "aliasDataList"
+
+out=$(mcp_call 2 "jms_trigger_report" '{}')
+check "jms_trigger_report" "$out" "triggerDataList"
+
+# Full CRUD cycle: create -> disable (already disabled) -> delete
+JMS_SETTINGS='{"aliasName":"E2E_JMS_Test","description":"E2E test connection","jndi_connectionFactoryLookupName":"ConnectionFactory","clientID":"e2e_jms_client","enabled":"false","transactionType":"0","nwm_brokerHost":"localhost:61616","nwm_brokerName":"n/a","nwm_clientGroup":"IS-JMS","classLoader":"INTEGRATION_SERVER"}'
+out=$(mcp_call 2 "jms_connection_create" "{\"settings\":$(echo "$JMS_SETTINGS" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read().strip()))')}")
+check "jms_connection_create" "$out" "E2E_JMS_Test\|created\|success"
+
+out=$(mcp_call 2 "jms_connection_delete" '{"alias_name":"E2E_JMS_Test"}')
+check "jms_connection_delete" "$out" "deleted\|E2E_JMS_Test\|message"
+
 # ── Prompts ──────────────────────────────────────────────────
 echo "--- Prompts ---"
 out=$(mcp_prompt 2 "setup_kafka_streaming")

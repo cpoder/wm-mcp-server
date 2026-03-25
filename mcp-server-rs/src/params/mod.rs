@@ -1,5 +1,7 @@
 pub mod adapters;
 pub mod common;
+pub mod jms;
+pub mod jndi;
 pub mod namespace;
 pub mod packages;
 pub mod ports;
@@ -8,6 +10,8 @@ pub mod streaming;
 
 pub use adapters::*;
 pub use common::*;
+pub use jms::*;
+pub use jndi::*;
 pub use namespace::*;
 pub use packages::*;
 pub use ports::*;

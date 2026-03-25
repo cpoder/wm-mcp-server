@@ -4,6 +4,8 @@
 //! All operations use the IS HTTP API - no disk access required.
 
 mod adapters;
+mod jms;
+mod jndi;
 mod namespace;
 mod packages;
 mod ports;

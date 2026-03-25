@@ -1003,6 +1003,280 @@ impl WmServer {
         }
     }
 
+    // ── JNDI Provider Aliases ──────────────────────────────────────────
+
+    #[tool(description = "List all JNDI provider aliases.")]
+    async fn jndi_alias_list(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.jndi_alias_list().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Create or update a JNDI provider alias.\n\nRequired settings: jndiAliasName, description, initialContextFactory, providerURL.\nOptional: securityPrincipal, securityCredentials, otherProperties.\n\nCommon initialContextFactory values:\n- ActiveMQ: org.apache.activemq.jndi.ActiveMQInitialContextFactory\n- Universal Messaging: com.pcbsys.nirvana.nSpace.NirvanaContextFactory\n- File system: com.sun.jndi.fscontext.RefFSContextFactory\n- LDAP: com.sun.jndi.ldap.LdapCtxFactory\n\nIMPORTANT: The JNDI provider JARs must be in IS classpath (WmART/code/jars/static/) and IS must be restarted after adding JARs."
+    )]
+    async fn jndi_alias_set(
+        &self,
+        Parameters(p): Parameters<JndiAliasCreateParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let settings = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.jndi_alias_set(&settings).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Get details of a JNDI provider alias.")]
+    async fn jndi_alias_get(
+        &self,
+        Parameters(p): Parameters<JndiAliasNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.jndi_alias_get(&p.jndi_alias_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Delete a JNDI provider alias.")]
+    async fn jndi_alias_delete(
+        &self,
+        Parameters(p): Parameters<JndiAliasNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.jndi_alias_delete(&p.jndi_alias_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Test a JNDI lookup against a provider alias. Use to verify the JNDI connection works."
+    )]
+    async fn jndi_test_lookup(
+        &self,
+        Parameters(p): Parameters<JndiTestLookupParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.jndi_test_lookup(&p.jndi_alias_name, &p.lookup_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "List available JNDI provider templates (UM, ActiveMQ, LDAP, file system, etc.)."
+    )]
+    async fn jndi_template_list(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.jndi_templates().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    // ── JMS Messaging ──────────────────────────────────────────────────
+
+    #[tool(description = "List all JMS connection aliases with their status and configuration.")]
+    async fn jms_connection_list(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.jms_connection_list().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Create a JMS connection alias.\n\nRequired settings: aliasName, description, jndiProviderUrl, connectionFactoryLookupName, user, password, clientID.\nOptional: transactionType (0=no tx, 1=local, 2=xa), enabled (true/false)."
+    )]
+    async fn jms_connection_create(
+        &self,
+        Parameters(p): Parameters<JmsConnectionCreateParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let settings = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.jms_connection_create(&settings).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Update an existing JMS connection alias.")]
+    async fn jms_connection_update(
+        &self,
+        Parameters(p): Parameters<JmsConnectionUpdateParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let settings = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.jms_connection_update(&p.alias_name, &settings).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Delete a JMS connection alias (must be disabled first).")]
+    async fn jms_connection_delete(
+        &self,
+        Parameters(p): Parameters<JmsConnectionNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.jms_connection_delete(&p.alias_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Enable a JMS connection alias.")]
+    async fn jms_connection_enable(
+        &self,
+        Parameters(p): Parameters<JmsConnectionNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.jms_connection_enable(&p.alias_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Disable a JMS connection alias.")]
+    async fn jms_connection_disable(
+        &self,
+        Parameters(p): Parameters<JmsConnectionNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.jms_connection_disable(&p.alias_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "List all JMS triggers with their status and configuration.")]
+    async fn jms_trigger_report(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.jms_trigger_report().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Create a JMS trigger.\n\nRequired settings: triggerName (full ns path), packageName, connectionAlias, destinationName, destinationType (QUEUE/TOPIC), serviceName (service to invoke on message)."
+    )]
+    async fn jms_trigger_create(
+        &self,
+        Parameters(p): Parameters<JmsTriggerCreateParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let settings = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.jms_trigger_create(&settings).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Update a JMS trigger configuration.")]
+    async fn jms_trigger_update(
+        &self,
+        Parameters(p): Parameters<JmsTriggerUpdateParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let settings = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.jms_trigger_update(&p.trigger_name, &settings).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Delete a JMS trigger.")]
+    async fn jms_trigger_delete(
+        &self,
+        Parameters(p): Parameters<JmsTriggerNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.jms_trigger_delete(&p.trigger_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Enable a JMS trigger (starts consuming messages).")]
+    async fn jms_trigger_enable(
+        &self,
+        Parameters(p): Parameters<JmsTriggerNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.jms_trigger_enable(&p.trigger_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Disable a JMS trigger (stops consuming messages).")]
+    async fn jms_trigger_disable(
+        &self,
+        Parameters(p): Parameters<JmsTriggerNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.jms_trigger_disable(&p.trigger_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Suspend a JMS trigger (pauses but stays connected).")]
+    async fn jms_trigger_suspend(
+        &self,
+        Parameters(p): Parameters<JmsTriggerNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.jms_trigger_suspend(&p.trigger_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "List JMS destinations (queues/topics) available on a connection.")]
+    async fn jms_destination_list(
+        &self,
+        Parameters(p): Parameters<JmsDestinationListParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.jms_destination_list(&p.alias_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────
 
     #[tool(
