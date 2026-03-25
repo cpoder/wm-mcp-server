@@ -14,6 +14,7 @@ mod mqtt;
 mod namespace;
 mod oauth;
 mod packages;
+mod packages_ext;
 mod ports;
 mod remote_servers;
 mod scheduler;

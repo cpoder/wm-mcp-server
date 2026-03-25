@@ -471,6 +471,53 @@ check "truststore_list" "$out" "trustStores\|DEFAULT_IS_TRUSTSTORE"
 out=$(mcp_call 2 "security_settings_get" '{}')
 check "security_settings_get" "$out" "watt.server"
 
+# ── Package Management Extended ───────────────────────────────
+echo "--- Package Extended ---"
+out=$(mcp_call 2 "package_info" '{"package_name":"ClaudeDemo"}')
+check "package_info" "$out" "services\|ClaudeDemo"
+
+out=$(mcp_call 2 "package_dependencies" '{"package_name":"ClaudeDemo"}')
+check "package_dependencies" "$out" "dependList\|package"
+
+out=$(mcp_call 2 "package_jar_list" '{"package_name":"ClaudeDemo"}')
+check "package_jar_list" "$out" "jars"
+
+# Test package_delete (create a temp package, then delete it)
+mcp_call 2 "package_create" '{"package_name":"E2ETempDelete"}' > /dev/null
+out=$(mcp_call 2 "package_delete" '{"package_name":"E2ETempDelete"}')
+check "package_delete" "$out" "deleted\|E2ETempDelete"
+
+# ── Document Type Generation ─────────────────────────────────
+echo "--- DocType Generation ---"
+# Generate from JSON sample
+out=$(mcp_call 2 "doctype_gen_from_json" '{"json_string":"{\"name\":\"test\",\"age\":25,\"active\":true}","package_name":"E2ETestPkg","ifc_name":"e2etest","record_name":"jsonDoc"}')
+check "doctype_gen_from_json" "$out" "isSuccessful.*true\|jsonDoc"
+
+# Verify the doc type was created
+out=$(mcp_call 2 "node_get" '{"name":"e2etest:jsonDoc"}')
+check "doctype_gen_json_verify" "$out" "node_type\|record\|jsonDoc"
+
+# XML/XSD gen available but XML escaping in JSON transport is tricky -- tested via curl directly
+
+# Clean up generated doc types
+mcp_call 2 "node_delete" '{"name":"e2etest:jsonDoc"}' > /dev/null 2>&1
+
+# ── URL Aliases ──────────────────────────────────────────────
+echo "--- URL Aliases ---"
+out=$(mcp_call 2 "url_alias_list" '{}')
+check "url_alias_list" "$out" "aliasList"
+
+# Full lifecycle: add -> get -> delete
+ALIAS_SETTINGS='{"alias":"e2etestalias","urlPath":"invoke/claudedemo.services:helloWorld","package":"ClaudeDemo"}'
+out=$(mcp_call 2 "url_alias_add" "{\"settings\":$(echo "$ALIAS_SETTINGS" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read().strip()))')}")
+check "url_alias_add" "$out" "Added\|e2etestalias"
+
+out=$(mcp_call 2 "url_alias_get" '{"alias":"e2etestalias"}')
+check "url_alias_get" "$out" "e2etestalias\|urlPath"
+
+out=$(mcp_call 2 "url_alias_delete" '{"alias":"e2etestalias"}')
+check "url_alias_delete" "$out" "Deleted\|e2etestalias"
+
 # ── Prompts ──────────────────────────────────────────────────
 echo "--- Prompts ---"
 for pname in setup_kafka_streaming setup_jdbc_connection setup_sap_connection setup_jms_connection setup_mqtt_connection setup_scheduled_task setup_rest_api setup_user_management setup_oauth; do

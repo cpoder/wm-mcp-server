@@ -2480,6 +2480,241 @@ impl WmServer {
         }
     }
 
+    // ── Package Management Extended ────────────────────────────────────
+
+    #[tool(
+        description = "Delete a package from the IS (removes all contents). Package must be disabled first."
+    )]
+    async fn package_delete(
+        &self,
+        Parameters(p): Parameters<PackageNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.package_delete(&p.package_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Get detailed information about a package (services, doc types, triggers, etc.)."
+    )]
+    async fn package_info(
+        &self,
+        Parameters(p): Parameters<PackageNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.package_info(&p.package_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Get the dependency list for a package.")]
+    async fn package_dependencies(
+        &self,
+        Parameters(p): Parameters<PackageNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.package_dependencies(&p.package_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "List JAR files in a package's code/jars directory.")]
+    async fn package_jar_list(
+        &self,
+        Parameters(p): Parameters<PackageNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.package_jar_list(&p.package_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    // ── Document Type Generation ────────────────────────────────────────
+
+    #[tool(
+        description = "Generate a document type from a JSON sample string.\n\nThe IS infers the structure (field names, types) from the JSON and creates a matching document type."
+    )]
+    async fn doctype_gen_from_json(
+        &self,
+        Parameters(p): Parameters<DocTypeGenJsonParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c
+            .doctype_gen_from_json(&p.json_string, &p.package_name, &p.ifc_name, &p.record_name)
+            .await
+        {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Generate a document type from a JSON Schema string.\n\nThe IS creates a document type matching the schema structure."
+    )]
+    async fn doctype_gen_from_json_schema(
+        &self,
+        Parameters(p): Parameters<DocTypeGenJsonSchemaParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c
+            .doctype_gen_from_json_schema(
+                &p.json_schema,
+                &p.package_name,
+                &p.ifc_name,
+                &p.record_name,
+            )
+            .await
+        {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Generate a document type from an XSD (XML Schema Definition) string.")]
+    async fn doctype_gen_from_xsd(
+        &self,
+        Parameters(p): Parameters<DocTypeGenXsdParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c
+            .doctype_gen_from_xsd(&p.xsd_source, &p.package_name, &p.ifc_name, &p.record_name)
+            .await
+        {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Generate a document type from an XML sample string.\n\nThe IS infers the structure from the XML elements and attributes."
+    )]
+    async fn doctype_gen_from_xml(
+        &self,
+        Parameters(p): Parameters<DocTypeGenXmlParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c
+            .doctype_gen_from_xml(&p.xml_string, &p.package_name, &p.ifc_name, &p.record_name)
+            .await
+        {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    // ── SAP Document Type Generation ────────────────────────────────────
+
+    #[tool(
+        description = "Generate a document type from an SAP IDoc type.\n\nRequires an active SAP adapter connection. The IS retrieves the IDoc metadata from the SAP system and creates a matching IS document type."
+    )]
+    async fn sap_idoc_doctype_create(
+        &self,
+        Parameters(p): Parameters<SapIDocDocTypeParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let mut settings = json!({
+            "systemId": p.system_id,
+            "iDocType": p.idoc_type,
+            "packageName": p.package_name,
+            "folderName": p.folder_name,
+            "documentTypeName": p.document_type_name,
+        });
+        if let Some(cim) = &p.cim_type {
+            settings
+                .as_object_mut()
+                .unwrap()
+                .insert("cimType".into(), json!(cim));
+        }
+        match c.sap_idoc_doctype_create(&settings).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Generate a document type from an SAP RFC function module or BAPI structure.\n\nRequires an active SAP adapter connection. The IS retrieves the RFC/BAPI metadata from the SAP system and creates a matching IS document type."
+    )]
+    async fn sap_rfc_doctype_create(
+        &self,
+        Parameters(p): Parameters<SapRfcDocTypeParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c
+            .sap_rfc_doctype_create(&json!({
+                "systemId": p.system_id,
+                "structName": p.struct_name,
+                "packageName": p.package_name,
+                "folderName": p.folder_name,
+                "documentTypeName": p.document_type_name,
+            }))
+            .await
+        {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    // ── URL Aliases ─────────────────────────────────────────────────────
+
+    #[tool(description = "List all HTTP URL aliases configured on the IS.")]
+    async fn url_alias_list(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.url_alias_list().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Add an HTTP URL alias.\n\nRequired settings: alias (name, no leading /), urlPath (e.g., \"invoke/mypkg.svc:name\" or \"restv2/mypkg.svc:name/resource\"), package.\nOptional: portList, association."
+    )]
+    async fn url_alias_add(
+        &self,
+        Parameters(p): Parameters<UrlAliasAddParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let settings = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.url_alias_add(&settings).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Get details of an HTTP URL alias.")]
+    async fn url_alias_get(
+        &self,
+        Parameters(p): Parameters<UrlAliasNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.url_alias_get(&p.alias).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Delete an HTTP URL alias.")]
+    async fn url_alias_delete(
+        &self,
+        Parameters(p): Parameters<UrlAliasNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.url_alias_delete(&p.alias).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────
 
     #[tool(
