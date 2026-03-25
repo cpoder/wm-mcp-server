@@ -275,6 +275,42 @@ check "scheduler_pause" "$out" "paused\|message\|status"
 out=$(mcp_call 2 "scheduler_resume" '{}')
 check "scheduler_resume" "$out" "resumed\|message\|status"
 
+# ── User & Access Management (full lifecycle) ───────────────
+echo "--- Users & Access ---"
+out=$(mcp_call 2 "user_list" '{}')
+check "user_list" "$out" "users\|Administrator"
+
+out=$(mcp_call 2 "group_list" '{}')
+check "group_list" "$out" "groups\|Administrators"
+
+out=$(mcp_call 2 "acl_list" '{}')
+check "acl_list" "$out" "aclgroups\|Administrators"
+
+out=$(mcp_call 2 "account_locking_get" '{}')
+check "account_locking_get" "$out" "isEnabled\|maximumLoginAttempts"
+
+# Full lifecycle: create user -> disable -> enable -> create group -> delete group -> delete user
+out=$(mcp_call 2 "user_add" '{"username":"e2etestuser","password":"TestPass123"}')
+check "user_add" "$out" "success.*true\|e2etestuser"
+
+out=$(mcp_call 2 "user_set_disabled" '{"username":"e2etestuser","disabled":true}')
+check "user_disable" "$out" "User\|message"
+
+out=$(mcp_call 2 "user_disabled_list" '{}')
+check "user_disabled_list" "$out" "e2etestuser\|disabledUsers"
+
+out=$(mcp_call 2 "user_set_disabled" '{"username":"e2etestuser","disabled":false}')
+check "user_enable" "$out" "User\|message"
+
+out=$(mcp_call 2 "group_add" '{"groupname":"E2ETestGroup"}')
+check "group_add" "$out" "success.*true\|Added"
+
+out=$(mcp_call 2 "group_delete" '{"groupname":"E2ETestGroup"}')
+check "group_delete" "$out" "success.*true\|Deleted"
+
+out=$(mcp_call 2 "user_delete" '{"username":"e2etestuser"}')
+check "user_delete" "$out" "success.*true\|Deleted"
+
 # ── Prompts ──────────────────────────────────────────────────
 echo "--- Prompts ---"
 out=$(mcp_prompt 2 "setup_kafka_streaming")

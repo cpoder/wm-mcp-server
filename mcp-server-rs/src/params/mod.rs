@@ -9,6 +9,7 @@ pub mod ports;
 pub mod scheduler;
 pub mod services;
 pub mod streaming;
+pub mod users;
 
 pub use adapters::*;
 pub use common::*;
@@ -21,3 +22,4 @@ pub use ports::*;
 pub use scheduler::*;
 pub use services::*;
 pub use streaming::*;
+pub use users::*;
