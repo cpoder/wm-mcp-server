@@ -16,7 +16,7 @@ impl super::ISClient {
         alias_name: &str,
         settings: &Value,
     ) -> Result<Value, String> {
-        let mut payload = json!({"aliasName": alias_name});
+        let mut payload = json!({"name": alias_name});
         if let Some(obj) = settings.as_object() {
             for (k, v) in obj {
                 payload
@@ -32,7 +32,7 @@ impl super::ISClient {
     pub async fn mqtt_connection_delete(&self, alias_name: &str) -> Result<Value, String> {
         self.invoke_post(
             "wm.server.mqtt:deleteConnectionAlias",
-            &json!({"aliasName": alias_name}),
+            &json!({"name": alias_name}),
         )
         .await
     }
@@ -40,7 +40,7 @@ impl super::ISClient {
     pub async fn mqtt_connection_enable(&self, alias_name: &str) -> Result<Value, String> {
         self.invoke_post(
             "wm.server.mqtt:enableConnectionAlias",
-            &json!({"aliasName": alias_name}),
+            &json!({"name": alias_name}),
         )
         .await
     }
@@ -48,7 +48,7 @@ impl super::ISClient {
     pub async fn mqtt_connection_disable(&self, alias_name: &str) -> Result<Value, String> {
         self.invoke_post(
             "wm.server.mqtt:disableConnectionAlias",
-            &json!({"aliasName": alias_name}),
+            &json!({"name": alias_name}),
         )
         .await
     }

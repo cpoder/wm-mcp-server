@@ -204,7 +204,7 @@ check "jms_connection_create" "$out" "E2E_JMS_Test\|created\|success"
 out=$(mcp_call 2 "jms_connection_delete" '{"alias_name":"E2E_JMS_Test"}')
 check "jms_connection_delete" "$out" "deleted\|E2E_JMS_Test\|message"
 
-# ── MQTT Messaging ───────────────────────────────────────────
+# ── MQTT Messaging (full E2E with Mosquitto broker) ─────────
 echo "--- MQTT Messaging ---"
 out=$(mcp_call 2 "mqtt_connection_list" '{}')
 check "mqtt_connection_list" "$out" "aliasDataList"
@@ -212,13 +212,30 @@ check "mqtt_connection_list" "$out" "aliasDataList"
 out=$(mcp_call 2 "mqtt_trigger_report" '{}')
 check "mqtt_trigger_report" "$out" "triggerDataList"
 
-# CRUD cycle: create -> delete (skip enable since no MQTT broker configured in IS)
-MQTT_SETTINGS='{"aliasName":"E2E_MQTT_Test","description":"E2E MQTT test","brokerURL":"tcp://localhost:1883","clientID":"e2e_mqtt_client","enabled":"false"}'
+# Full lifecycle: create -> enable -> verify connected -> publish -> disable -> delete
+# Requires Mosquitto running on localhost:1883 (docker run -d --name mosquitto-test -p 1883:1883 eclipse-mosquitto:2 mosquitto -c /mosquitto-no-auth.conf)
+MQTT_SETTINGS='{"name":"E2E_MQTT_Test","description":"E2E MQTT test","package":"WmRoot","host":"tcp://localhost:1883","clientId":"isE2eMqttTest","timeout":"30","keepAlive":"60","cleanSessionEnabled":"true"}'
 out=$(mcp_call 2 "mqtt_connection_create" "{\"settings\":$(echo "$MQTT_SETTINGS" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read().strip()))')}")
-check "mqtt_connection_create" "$out" "E2E_MQTT_Test\|created\|aliasName"
+check "mqtt_connection_create" "$out" "E2E_MQTT_Test\|created\|success"
+
+out=$(mcp_call 2 "mqtt_connection_enable" '{"alias_name":"E2E_MQTT_Test"}')
+check "mqtt_connection_enable" "$out" "enabled\|E2E_MQTT_Test"
+
+sleep 2
+
+# Verify connection is connected by checking the report
+out=$(mcp_call 2 "mqtt_connection_list" '{}')
+check "mqtt_connected" "$out" "true\|Running"
+
+# Publish a message via IS (use service_invoke since wm.server.mqtt:publish is the IS service)
+out=$(mcp_call 2 "service_invoke" '{"service_path":"wm.server.mqtt:publish","inputs":"{\"connectionAliasName\":\"E2E_MQTT_Test\",\"topicName\":\"e2e/test\",\"MqttMessage\":{\"body\":\"E2E_VERIFY\"}}"}')
+check "mqtt_publish" "$out" "connectionAliasName\|E2E_MQTT_Test\|topicName"
+
+out=$(mcp_call 2 "mqtt_connection_disable" '{"alias_name":"E2E_MQTT_Test"}')
+check "mqtt_connection_disable" "$out" "disabled\|E2E_MQTT_Test"
 
 out=$(mcp_call 2 "mqtt_connection_delete" '{"alias_name":"E2E_MQTT_Test"}')
-check "mqtt_connection_delete" "$out" "deleted\|E2E_MQTT_Test\|message"
+check "mqtt_connection_delete" "$out" "deleted\|E2E_MQTT_Test"
 
 # ── Prompts ──────────────────────────────────────────────────
 echo "--- Prompts ---"
