@@ -204,6 +204,22 @@ check "jms_connection_create" "$out" "E2E_JMS_Test\|created\|success"
 out=$(mcp_call 2 "jms_connection_delete" '{"alias_name":"E2E_JMS_Test"}')
 check "jms_connection_delete" "$out" "deleted\|E2E_JMS_Test\|message"
 
+# ── MQTT Messaging ───────────────────────────────────────────
+echo "--- MQTT Messaging ---"
+out=$(mcp_call 2 "mqtt_connection_list" '{}')
+check "mqtt_connection_list" "$out" "aliasDataList"
+
+out=$(mcp_call 2 "mqtt_trigger_report" '{}')
+check "mqtt_trigger_report" "$out" "triggerDataList"
+
+# CRUD cycle: create -> delete (skip enable since no MQTT broker configured in IS)
+MQTT_SETTINGS='{"aliasName":"E2E_MQTT_Test","description":"E2E MQTT test","brokerURL":"tcp://localhost:1883","clientID":"e2e_mqtt_client","enabled":"false"}'
+out=$(mcp_call 2 "mqtt_connection_create" "{\"settings\":$(echo "$MQTT_SETTINGS" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read().strip()))')}")
+check "mqtt_connection_create" "$out" "E2E_MQTT_Test\|created\|aliasName"
+
+out=$(mcp_call 2 "mqtt_connection_delete" '{"alias_name":"E2E_MQTT_Test"}')
+check "mqtt_connection_delete" "$out" "deleted\|E2E_MQTT_Test\|message"
+
 # ── Prompts ──────────────────────────────────────────────────
 echo "--- Prompts ---"
 out=$(mcp_prompt 2 "setup_kafka_streaming")

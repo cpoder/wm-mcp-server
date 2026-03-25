@@ -1277,6 +1277,168 @@ impl WmServer {
         }
     }
 
+    // ── MQTT Messaging ─────────────────────────────────────────────────
+
+    #[tool(description = "List all MQTT connection aliases with their status and configuration.")]
+    async fn mqtt_connection_list(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.mqtt_connection_list().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Create an MQTT connection alias.\n\nRequired settings: aliasName, description, brokerURL (e.g., \"tcp://host:1883\"), clientID.\nOptional: cleanSession, keepAliveInterval, connectionTimeout, user, password."
+    )]
+    async fn mqtt_connection_create(
+        &self,
+        Parameters(p): Parameters<MqttConnectionCreateParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let settings = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.mqtt_connection_create(&settings).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Update an existing MQTT connection alias.")]
+    async fn mqtt_connection_update(
+        &self,
+        Parameters(p): Parameters<MqttConnectionUpdateParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let settings = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.mqtt_connection_update(&p.alias_name, &settings).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Delete an MQTT connection alias (must be disabled first).")]
+    async fn mqtt_connection_delete(
+        &self,
+        Parameters(p): Parameters<MqttConnectionNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.mqtt_connection_delete(&p.alias_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Enable an MQTT connection alias.")]
+    async fn mqtt_connection_enable(
+        &self,
+        Parameters(p): Parameters<MqttConnectionNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.mqtt_connection_enable(&p.alias_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Disable an MQTT connection alias.")]
+    async fn mqtt_connection_disable(
+        &self,
+        Parameters(p): Parameters<MqttConnectionNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.mqtt_connection_disable(&p.alias_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "List all MQTT triggers with their status and configuration.")]
+    async fn mqtt_trigger_report(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.mqtt_trigger_report().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Create an MQTT trigger.\n\nRequired settings: triggerName (full ns path), packageName, connectionAlias, topicName, qos (0/1/2), serviceName (service to invoke on message)."
+    )]
+    async fn mqtt_trigger_create(
+        &self,
+        Parameters(p): Parameters<MqttTriggerCreateParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let settings = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.mqtt_trigger_create(&settings).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Delete an MQTT trigger.")]
+    async fn mqtt_trigger_delete(
+        &self,
+        Parameters(p): Parameters<MqttTriggerNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.mqtt_trigger_delete(&p.trigger_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Enable an MQTT trigger (starts subscribing to messages).")]
+    async fn mqtt_trigger_enable(
+        &self,
+        Parameters(p): Parameters<MqttTriggerNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.mqtt_trigger_enable(&p.trigger_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Disable an MQTT trigger (stops subscribing).")]
+    async fn mqtt_trigger_disable(
+        &self,
+        Parameters(p): Parameters<MqttTriggerNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.mqtt_trigger_disable(&p.trigger_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Suspend an MQTT trigger (pauses but stays connected).")]
+    async fn mqtt_trigger_suspend(
+        &self,
+        Parameters(p): Parameters<MqttTriggerNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.mqtt_trigger_suspend(&p.trigger_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────
 
     #[tool(

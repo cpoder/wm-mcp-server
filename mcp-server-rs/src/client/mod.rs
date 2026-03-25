@@ -6,6 +6,7 @@
 mod adapters;
 mod jms;
 mod jndi;
+mod mqtt;
 mod namespace;
 mod packages;
 mod ports;
