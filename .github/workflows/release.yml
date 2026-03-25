@@ -8,89 +8,149 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
-permissions:
-  contents: write
-
 jobs:
+  audit:
+    name: Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+      - run: cargo audit --file mcp-server-rs/Cargo.lock
+
   build:
-    name: Build (${{ matrix.target }})
+    name: Build ${{ matrix.target }}
+    needs: audit
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         include:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
-            use_cross: false
+            artifact_name: wm-mcp-server
+            asset_name: wm-mcp-server-linux-x86_64
+
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-latest
+            artifact_name: wm-mcp-server
+            asset_name: wm-mcp-server-linux-aarch64
             use_cross: true
+
           - target: x86_64-apple-darwin
             os: macos-latest
-            use_cross: false
+            artifact_name: wm-mcp-server
+            asset_name: wm-mcp-server-macos-x86_64
+
           - target: aarch64-apple-darwin
             os: macos-latest
-            use_cross: false
+            artifact_name: wm-mcp-server
+            asset_name: wm-mcp-server-macos-aarch64
+
           - target: x86_64-pc-windows-msvc
             os: windows-latest
-            use_cross: false
+            artifact_name: wm-mcp-server.exe
+            asset_name: wm-mcp-server-windows-x86_64.exe
+
     steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: mcp-server-rs
+
       - name: Install cross
         if: matrix.use_cross
-        run: cargo install cross --locked
+        uses: taiki-e/install-action@cross
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+          workspaces: mcp-server-rs
+
       - name: Build (cross)
         if: matrix.use_cross
         run: cross build --release --target ${{ matrix.target }} --manifest-path mcp-server-rs/Cargo.toml
-      - name: Build (cargo)
+
+      - name: Build (native)
         if: ${{ !matrix.use_cross }}
         run: cargo build --release --target ${{ matrix.target }} --manifest-path mcp-server-rs/Cargo.toml
-      - name: Prepare binary (Unix)
+
+      - name: Prepare artifact (Unix)
         if: runner.os != 'Windows'
-        run: cp mcp-server-rs/target/${{ matrix.target }}/release/wm-mcp-server wm-mcp-server-${{ matrix.target }}
-      - name: Prepare binary (Windows)
+        run: |
+          mkdir -p artifacts
+          cp mcp-server-rs/target/${{ matrix.target }}/release/${{ matrix.artifact_name }} artifacts/${{ matrix.asset_name }}
+          chmod +x artifacts/${{ matrix.asset_name }}
+
+      - name: Prepare artifact (Windows)
         if: runner.os == 'Windows'
-        run: cp mcp-server-rs/target/${{ matrix.target }}/release/wm-mcp-server.exe wm-mcp-server-${{ matrix.target }}.exe
-      - name: Upload artifact (Unix)
-        if: runner.os != 'Windows'
-        uses: actions/upload-artifact@v4
+        run: |
+          mkdir -p artifacts
+          cp mcp-server-rs/target/${{ matrix.target }}/release/${{ matrix.artifact_name }} artifacts/${{ matrix.asset_name }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
         with:
-          name: wm-mcp-server-${{ matrix.target }}
-          path: wm-mcp-server-${{ matrix.target }}
-      - name: Upload artifact (Windows)
-        if: runner.os == 'Windows'
-        uses: actions/upload-artifact@v4
-        with:
-          name: wm-mcp-server-${{ matrix.target }}
-          path: wm-mcp-server-${{ matrix.target }}.exe
+          name: ${{ matrix.asset_name }}
+          path: artifacts/${{ matrix.asset_name }}
 
   release:
     name: Create Release
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v6
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v8
         with:
           path: artifacts
-          merge-multiple: true
-      - name: Create GitHub Release
+
+      - name: List artifacts
+        run: find artifacts -type f | xargs ls -la
+
+      - name: Create checksums
+        run: |
+          cd artifacts
+          for dir in */; do
+            for file in "$dir"*; do
+              if [ -f "$file" ]; then
+                sha256sum "$file" >> checksums.txt
+              fi
+            done
+          done
+          cat checksums.txt
+
+      - name: Extract version
+        id: version
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
+          name: v${{ steps.version.outputs.version }}
           generate_release_notes: true
-          files: artifacts/*
+          draft: false
+          prerelease: ${{ contains(github.ref, '-alpha') || contains(github.ref, '-beta') || contains(github.ref, '-rc') }}
+          files: |
+            artifacts/wm-mcp-server-linux-x86_64/wm-mcp-server-linux-x86_64
+            artifacts/wm-mcp-server-linux-aarch64/wm-mcp-server-linux-aarch64
+            artifacts/wm-mcp-server-macos-x86_64/wm-mcp-server-macos-x86_64
+            artifacts/wm-mcp-server-macos-aarch64/wm-mcp-server-macos-aarch64
+            artifacts/wm-mcp-server-windows-x86_64.exe/wm-mcp-server-windows-x86_64.exe
+            artifacts/checksums.txt
 
   publish-crate:
     name: Publish to crates.io
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo publish --manifest-path mcp-server-rs/Cargo.toml --allow-dirty
         env:
