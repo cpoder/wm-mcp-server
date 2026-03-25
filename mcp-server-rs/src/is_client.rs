@@ -710,4 +710,146 @@ impl ISClient {
         let truncated: String = text.chars().take(500).collect();
         Ok(json!({"status": "created", "notification": notification_name, "response": truncated}))
     }
+
+    // ── Streaming (WmStreaming) ────────────────────────────────────────
+
+    pub async fn streaming_connection_list(&self) -> Result<Value, String> {
+        self.invoke_get("wm.server.streaming:getConnectionAliasReport")
+            .await
+    }
+
+    pub async fn streaming_connection_create(&self, settings: &Value) -> Result<Value, String> {
+        self.invoke_post("wm.server.streaming:createConnectionAlias", settings)
+            .await
+    }
+
+    pub async fn streaming_connection_enable(&self, name: &str) -> Result<Value, String> {
+        self.invoke_post(
+            "wm.server.streaming:enableConnectionAlias",
+            &json!({"name": name}),
+        )
+        .await
+    }
+
+    pub async fn streaming_connection_disable(&self, name: &str) -> Result<Value, String> {
+        self.invoke_post(
+            "wm.server.streaming:disableConnectionAlias",
+            &json!({"name": name}),
+        )
+        .await
+    }
+
+    pub async fn streaming_connection_delete(&self, name: &str) -> Result<Value, String> {
+        self.invoke_post(
+            "wm.server.streaming:deleteConnectionAlias",
+            &json!({"name": name}),
+        )
+        .await
+    }
+
+    pub async fn streaming_connection_test(&self, name: &str) -> Result<Value, String> {
+        self.invoke_post(
+            "wm.server.streaming:testConnectionAlias",
+            &json!({"name": name}),
+        )
+        .await
+    }
+
+    pub async fn streaming_providers(&self) -> Result<Value, String> {
+        self.invoke_get("wm.server.streaming:getAvailableProviders")
+            .await
+    }
+
+    pub async fn streaming_event_source_list(
+        &self,
+        alias_name: Option<&str>,
+    ) -> Result<Value, String> {
+        let mut payload = json!({});
+        if let Some(name) = alias_name {
+            payload
+                .as_object_mut()
+                .unwrap()
+                .insert("aliasName".into(), json!(name));
+        }
+        self.invoke_post("wm.server.streaming:getEventSourceReport", &payload)
+            .await
+    }
+
+    pub async fn streaming_event_source_create(&self, settings: &Value) -> Result<Value, String> {
+        self.invoke_post("wm.server.streaming:createEventSourceFlat", settings)
+            .await
+    }
+
+    pub async fn streaming_event_source_delete(
+        &self,
+        alias_name: &str,
+        reference_id: &str,
+    ) -> Result<Value, String> {
+        self.invoke_post(
+            "wm.server.streaming:deleteEventSource",
+            &json!({"aliasName": alias_name, "referenceId": reference_id}),
+        )
+        .await
+    }
+
+    pub async fn streaming_trigger_list(&self) -> Result<Value, String> {
+        self.invoke_get("wm.server.streaming:getTriggerReport")
+            .await
+    }
+
+    pub async fn streaming_trigger_enable(&self, name: &str) -> Result<Value, String> {
+        self.invoke_post("wm.server.streaming:enableTriggers", &json!({"name": name}))
+            .await
+    }
+
+    pub async fn streaming_trigger_disable(&self, name: &str) -> Result<Value, String> {
+        self.invoke_post(
+            "wm.server.streaming:disableTriggers",
+            &json!({"name": name}),
+        )
+        .await
+    }
+
+    pub async fn streaming_trigger_suspend(&self, name: &str) -> Result<Value, String> {
+        self.invoke_post(
+            "wm.server.streaming:suspendTriggers",
+            &json!({"name": name}),
+        )
+        .await
+    }
+
+    // ── Internal helpers ───────────────────────────────────────────────
+
+    async fn invoke_get(&self, service: &str) -> Result<Value, String> {
+        let r = self
+            .client
+            .get(self.url(&format!("/invoke/{service}")))
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+        r.error_for_status_ref().map_err(|e| e.to_string())?;
+        let text = r.text().await.map_err(|e| e.to_string())?;
+        if text.trim().is_empty() {
+            Ok(json!({"status": "ok"}))
+        } else {
+            serde_json::from_str(&text).map_err(|e| e.to_string())
+        }
+    }
+
+    async fn invoke_post(&self, service: &str, payload: &Value) -> Result<Value, String> {
+        let r = self
+            .client
+            .post(self.url(&format!("/invoke/{service}")))
+            .json(payload)
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+        r.error_for_status_ref().map_err(|e| e.to_string())?;
+        let text = r.text().await.map_err(|e| e.to_string())?;
+        if text.trim().is_empty() {
+            Ok(json!({"status": "ok"}))
+        } else {
+            serde_json::from_str(&text).map_err(|e| e.to_string())
+        }
+    }
 }

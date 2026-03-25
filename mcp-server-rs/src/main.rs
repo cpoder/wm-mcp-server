@@ -1,5 +1,6 @@
 mod config;
 mod is_client;
+mod prompts;
 mod server;
 
 use config::AppConfig;

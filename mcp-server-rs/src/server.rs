@@ -2,8 +2,9 @@
 
 use crate::is_client::ISClient;
 use rmcp::{
-    ServerHandler, handler::server::router::tool::ToolRouter, handler::server::wrapper::Parameters,
-    model::*, schemars, tool, tool_handler, tool_router,
+    RoleServer, ServerHandler, handler::server::router::tool::ToolRouter,
+    handler::server::wrapper::Parameters, model::*, schemars, service::RequestContext, tool,
+    tool_handler, tool_router,
 };
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -283,6 +284,96 @@ pub struct AdapterNotificationListenerParam {
 pub struct MapsetValueParam {
     #[schemars(description = "The string value to encode")]
     pub value: String,
+}
+
+// ── Streaming param structs ────────────────────────────────────────
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct StreamingConnectionCreateParam {
+    #[schemars(description = "Connection alias base name (letters, digits, underscores)")]
+    pub base_name: String,
+    #[schemars(description = "Full connection alias name (usually package_baseName)")]
+    pub name: String,
+    #[schemars(description = "Description of this connection")]
+    pub description: String,
+    #[schemars(description = "Provider type (e.g., \"Kafka\")")]
+    pub provider_type: String,
+    #[schemars(description = "Package name")]
+    pub package: String,
+    #[schemars(description = "Provider URI / bootstrap servers (e.g., \"localhost:9092\")")]
+    pub host: String,
+    #[schemars(description = "Client prefix for Kafka client ID")]
+    pub client_id: String,
+    #[schemars(description = "Security protocol: none, SSL, SASL_SSL, SASL_PLAINTEXT")]
+    pub security_protocol: Option<String>,
+    #[schemars(
+        description = "Extra configuration parameters as newline-separated name=value pairs"
+    )]
+    pub other_properties: Option<String>,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct StreamingConnectionNameParam {
+    #[schemars(description = "Streaming connection alias name")]
+    pub name: String,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct StreamingEventSourceCreateParam {
+    #[schemars(description = "Connection alias name this event spec belongs to")]
+    pub create_alias_name: String,
+    #[schemars(description = "Event specification name (unique within the connection alias)")]
+    pub create_reference_id: String,
+    #[schemars(description = "Kafka topic name")]
+    pub topic_name: String,
+    #[schemars(
+        description = "Key type: none, RAW, STRING, JSON, XML, DOUBLE, FLOAT, INTEGER, LONG"
+    )]
+    pub key_type: Option<String>,
+    #[schemars(
+        description = "Value type: none, RAW, STRING, JSON, XML, DOUBLE, FLOAT, INTEGER, LONG"
+    )]
+    pub value_type: Option<String>,
+    #[schemars(description = "Document type name for key (when key type is JSON or XML)")]
+    pub key_type_document_type: Option<String>,
+    #[schemars(description = "Document type name for value (when value type is JSON or XML)")]
+    pub value_type_document_type: Option<String>,
+    #[schemars(description = "Charset for key (default: UTF-8)")]
+    pub key_type_charset: Option<String>,
+    #[schemars(description = "Charset for value (default: UTF-8)")]
+    pub value_type_charset: Option<String>,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct StreamingEventSourceDeleteParam {
+    #[schemars(description = "Connection alias name")]
+    pub alias_name: String,
+    #[schemars(description = "Event specification reference ID")]
+    pub reference_id: String,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct StreamingEventSourceListParam {
+    #[schemars(description = "Filter by connection alias name (optional)")]
+    pub alias_name: Option<String>,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct StreamingTriggerNameParam {
+    #[schemars(description = "Trigger name")]
+    pub name: String,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -943,6 +1034,231 @@ impl WmServer {
         }
     }
 
+    // ── Streaming Connection Aliases ──────────────────────────────────
+
+    #[tool(description = "List all streaming connection aliases (Kafka, etc.) with their status.")]
+    async fn streaming_connection_list(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.streaming_connection_list().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Create a streaming connection alias (e.g., Kafka).\n\nRequired: base_name, name, description, provider_type, package, host, client_id.\nOptional: security_protocol (none/SSL/SASL_SSL/SASL_PLAINTEXT), other_properties (newline-separated name=value)."
+    )]
+    async fn streaming_connection_create(
+        &self,
+        Parameters(p): Parameters<StreamingConnectionCreateParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let mut settings = json!({
+            "baseName": p.base_name,
+            "name": p.name,
+            "description": p.description,
+            "type": p.provider_type,
+            "package": p.package,
+            "host": p.host,
+            "clientId": p.client_id,
+        });
+        let obj = settings.as_object_mut().unwrap();
+        if let Some(sp) = &p.security_protocol {
+            obj.insert("securityProtocol".into(), json!(sp));
+        }
+        if let Some(op) = &p.other_properties {
+            obj.insert("other_properties".into(), json!(op));
+        }
+        match c.streaming_connection_create(&settings).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Enable a streaming connection alias.")]
+    async fn streaming_connection_enable(
+        &self,
+        Parameters(p): Parameters<StreamingConnectionNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.streaming_connection_enable(&p.name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Disable a streaming connection alias.")]
+    async fn streaming_connection_disable(
+        &self,
+        Parameters(p): Parameters<StreamingConnectionNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.streaming_connection_disable(&p.name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Delete a streaming connection alias (must be disabled first).")]
+    async fn streaming_connection_delete(
+        &self,
+        Parameters(p): Parameters<StreamingConnectionNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.streaming_connection_delete(&p.name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Test a streaming connection alias by attempting to connect to the provider."
+    )]
+    async fn streaming_connection_test(
+        &self,
+        Parameters(p): Parameters<StreamingConnectionNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.streaming_connection_test(&p.name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "List available streaming provider types (e.g., Kafka).")]
+    async fn streaming_provider_list(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.streaming_providers().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    // ── Streaming Event Specifications ─────────────────────────────────
+
+    #[tool(
+        description = "List streaming event specifications (topic mappings). Optionally filter by connection alias name."
+    )]
+    async fn streaming_event_source_list(
+        &self,
+        Parameters(p): Parameters<StreamingEventSourceListParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.streaming_event_source_list(p.alias_name.as_deref()).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Create a streaming event specification (topic mapping).\n\nMaps a Kafka topic to an IS event with key/value type definitions.\nKey/value types: none, RAW, STRING, JSON, XML, DOUBLE, FLOAT, INTEGER, LONG."
+    )]
+    async fn streaming_event_source_create(
+        &self,
+        Parameters(p): Parameters<StreamingEventSourceCreateParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let mut settings = json!({
+            "create_aliasName": p.create_alias_name,
+            "create_referenceId": p.create_reference_id,
+            "topicName": p.topic_name,
+        });
+        let obj = settings.as_object_mut().unwrap();
+        if let Some(v) = &p.key_type {
+            obj.insert("keyType".into(), json!(v));
+        }
+        if let Some(v) = &p.value_type {
+            obj.insert("valueType".into(), json!(v));
+        }
+        if let Some(v) = &p.key_type_document_type {
+            obj.insert("keyType_documentType".into(), json!(v));
+        }
+        if let Some(v) = &p.value_type_document_type {
+            obj.insert("valueType_documentType".into(), json!(v));
+        }
+        if let Some(v) = &p.key_type_charset {
+            obj.insert("keyType_charset".into(), json!(v));
+        }
+        if let Some(v) = &p.value_type_charset {
+            obj.insert("valueType_charset".into(), json!(v));
+        }
+        match c.streaming_event_source_create(&settings).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Delete a streaming event specification.")]
+    async fn streaming_event_source_delete(
+        &self,
+        Parameters(p): Parameters<StreamingEventSourceDeleteParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c
+            .streaming_event_source_delete(&p.alias_name, &p.reference_id)
+            .await
+        {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    // ── Streaming Triggers ─────────────────────────────────────────────
+
+    #[tool(description = "List all streaming triggers with their status.")]
+    async fn streaming_trigger_list(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.streaming_trigger_list().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Enable a streaming trigger (starts consuming events).")]
+    async fn streaming_trigger_enable(
+        &self,
+        Parameters(p): Parameters<StreamingTriggerNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.streaming_trigger_enable(&p.name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Disable a streaming trigger (stops and disconnects).")]
+    async fn streaming_trigger_disable(
+        &self,
+        Parameters(p): Parameters<StreamingTriggerNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.streaming_trigger_disable(&p.name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Suspend a streaming trigger (pauses but stays connected).")]
+    async fn streaming_trigger_suspend(
+        &self,
+        Parameters(p): Parameters<StreamingTriggerNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.streaming_trigger_suspend(&p.name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────
 
     #[tool(
@@ -967,7 +1283,12 @@ impl WmServer {
 #[tool_handler]
 impl ServerHandler for WmServer {
     fn get_info(&self) -> ServerInfo {
-        ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
+        ServerInfo::new(
+            ServerCapabilities::builder()
+                .enable_tools()
+                .enable_prompts()
+                .build(),
+        )
             .with_server_info(Implementation::new(
                 "webmethods-is",
                 env!("CARGO_PKG_VERSION"),
@@ -998,5 +1319,28 @@ impl ServerHandler for WmServer {
                 "- dim: 0=scalar, 1=array\n",
                 "Example: /myString;1;0 (scalar string), /myList;1;1 (string array), /myDoc;2;0 (record)",
             ))
+    }
+
+    fn list_prompts(
+        &self,
+        _request: Option<PaginatedRequestParams>,
+        _context: RequestContext<RoleServer>,
+    ) -> impl std::future::Future<Output = Result<ListPromptsResult, ErrorData>> + Send + '_ {
+        std::future::ready(Ok(ListPromptsResult {
+            prompts: crate::prompts::list(),
+            ..Default::default()
+        }))
+    }
+
+    fn get_prompt(
+        &self,
+        request: GetPromptRequestParams,
+        _context: RequestContext<RoleServer>,
+    ) -> impl std::future::Future<Output = Result<GetPromptResult, ErrorData>> + Send + '_ {
+        std::future::ready(crate::prompts::get(&request.name).ok_or_else(|| ErrorData {
+            code: ErrorCode::INVALID_PARAMS,
+            message: Cow::Owned(format!("Unknown prompt: {}", request.name)),
+            data: None,
+        }))
     }
 }
