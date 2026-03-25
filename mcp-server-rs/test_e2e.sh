@@ -333,6 +333,26 @@ check "jdbc_pool_test" "$out" "E2ETestPool\|message"
 out=$(mcp_call 2 "jdbc_pool_delete" '{"pool":"E2ETestPool"}')
 check "jdbc_pool_delete" "$out" "deleted\|E2ETestPool"
 
+# ── Global Variables (full lifecycle) ────────────────────────
+echo "--- Global Variables ---"
+out=$(mcp_call 2 "global_var_list" '{}')
+check "global_var_list" "$out" "globalVariables"
+
+out=$(mcp_call 2 "global_var_add" '{"key":"E2E_TEST_VAR","value":"hello_from_e2e"}')
+check "global_var_add" "$out" "Success\|added"
+
+out=$(mcp_call 2 "global_var_get" '{"key":"E2E_TEST_VAR"}')
+check "global_var_get" "$out" "hello_from_e2e"
+
+out=$(mcp_call 2 "global_var_edit" '{"key":"E2E_TEST_VAR","value":"updated_value"}')
+check "global_var_edit" "$out" "Success\|updated"
+
+out=$(mcp_call 2 "global_var_get" '{"key":"E2E_TEST_VAR"}')
+check "global_var_get_updated" "$out" "updated_value"
+
+out=$(mcp_call 2 "global_var_remove" '{"key":"E2E_TEST_VAR"}')
+check "global_var_remove" "$out" "Success\|deleted"
+
 # ── Prompts ──────────────────────────────────────────────────
 echo "--- Prompts ---"
 out=$(mcp_prompt 2 "setup_kafka_streaming")

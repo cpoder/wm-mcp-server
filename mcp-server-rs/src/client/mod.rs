@@ -4,6 +4,7 @@
 //! All operations use the IS HTTP API - no disk access required.
 
 mod adapters;
+mod global_vars;
 mod jdbc_pools;
 mod jms;
 mod jndi;

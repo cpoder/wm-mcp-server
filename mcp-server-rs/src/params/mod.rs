@@ -1,5 +1,6 @@
 pub mod adapters;
 pub mod common;
+pub mod global_vars;
 pub mod jdbc_pools;
 pub mod jms;
 pub mod jndi;
@@ -14,6 +15,7 @@ pub mod users;
 
 pub use adapters::*;
 pub use common::*;
+pub use global_vars::*;
 pub use jdbc_pools::*;
 pub use jms::*;
 pub use jndi::*;

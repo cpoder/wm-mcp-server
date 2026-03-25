@@ -1861,6 +1861,71 @@ impl WmServer {
         }
     }
 
+    // ── Global Variables ─────────────────────────────────────────────────
+
+    #[tool(description = "List all global variables defined on the IS.")]
+    async fn global_var_list(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.global_var_list().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Get the value of a global variable.")]
+    async fn global_var_get(
+        &self,
+        Parameters(p): Parameters<GlobalVarKeyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.global_var_get(&p.key).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Add a new global variable. Set is_password=true for secrets.")]
+    async fn global_var_add(
+        &self,
+        Parameters(p): Parameters<GlobalVarAddParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c
+            .global_var_add(&p.key, &p.value, p.is_password.unwrap_or(false))
+            .await
+        {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Update the value of an existing global variable.")]
+    async fn global_var_edit(
+        &self,
+        Parameters(p): Parameters<GlobalVarEditParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.global_var_edit(&p.key, &p.value).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Remove a global variable.")]
+    async fn global_var_remove(
+        &self,
+        Parameters(p): Parameters<GlobalVarKeyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.global_var_remove(&p.key).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────
 
     #[tool(
