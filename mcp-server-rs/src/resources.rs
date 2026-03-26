@@ -28,6 +28,18 @@ pub const RESOURCES: &[DocResource] = &[
         description: "How to create JDBC adapter services with full table/column configuration. Select, Insert, CustomSQL examples with correct adapter_service_settings JSON.",
         content: ADAPTER_SERVICE_REF,
     },
+    DocResource {
+        uri: "wm://docs/flow-steps-reference",
+        name: "Flow Steps Reference (IBM Docs)",
+        description: "Official IBM documentation for all webMethods flow step types: INVOKE, BRANCH, LOOP, MAP, SEQUENCE, REPEAT, EXIT. Properties, behavior rules, failure conditions, and data mapping concepts.",
+        content: FLOW_STEPS_REF,
+    },
+    DocResource {
+        uri: "wm://docs/builtin-services",
+        name: "Built-In Services Reference",
+        description: "Input/output signatures for commonly used IS built-in services: pub.string (concat, replace, substring, etc.), pub.math (addInts, multiplyFloats, etc.), pub.list (appendToDocumentList, etc.), pub.date (formatDate, etc.), pub.flow (debugLog, getLastError, etc.).",
+        content: BUILTIN_SERVICES_REF,
+    },
 ];
 
 pub fn list() -> Vec<Resource> {
@@ -483,4 +495,811 @@ const ADAPTER_SERVICE_REF: &str = r#"# Adapter Service Configuration Reference
 }
 ```
 Note: Exclude identity/auto-increment columns from Insert update.* arrays.
+"#;
+
+const FLOW_STEPS_REF: &str = r#"# webMethods Flow Steps Reference
+Source: IBM webMethods Integration Server 11.1.0 Documentation
+
+A flow step is a basic unit of work expressed in the webMethods flow language that
+Integration Server interprets and executes at run time.
+
+## Available Flow Step Types
+
+INVOKE, BRANCH, LOOP, MAP, SEQUENCE, REPEAT, EXIT, TRY, CATCH, FINALLY,
+IF, ELSEIF, ELSE, SWITCH, CASE, DO, UNTIL, WHILE, BREAK, CONTINUE
+
+---
+
+## INVOKE
+
+The INVOKE step calls any type of service, including other flow services and web
+service connectors. You can invoke any service on the local Integration Server for
+which the caller has appropriate rights, built-in services, and services on remote
+Integration Servers. Flow services can call themselves recursively (ensure proper
+termination logic). INVOKE also supports input/output validation against the
+service signature.
+
+### INVOKE Properties
+
+| Property | Required | Description |
+|----------|----------|-------------|
+| Comments | No | Descriptive comment for the step. |
+| Label | No | Name of a document (IData object) in the pipeline to restrict this step's scope. Leave blank for full pipeline access. |
+| Timeout | No | Maximum seconds for step execution. If elapsed, Integration Server issues a FlowTimeoutException and continues with the next step. Supports pipeline variable substitution: `%variableName%` (must be String type). |
+| Service | Yes | Fully qualified name of the service to invoke. |
+| Validate input | No | Whether to validate input against the service input signature. True = validate, False = skip. |
+| Validate output | No | Whether to validate output against the service output signature. True = validate, False = skip. |
+
+### INVOKE Failure Conditions
+- The invoked service fails.
+- The specified service does not exist.
+- The specified service is disabled.
+
+### Pipeline View for INVOKE
+The Pipeline view shows two stages:
+
+**Before execution:** Pipeline In (variables in pipeline before service runs) and
+Service In (variables the service requires as input). You can insert pipeline
+modifiers here (link, set value, drop, add) to adjust pipeline contents before
+the service executes.
+
+**After execution:** Service Out (variables the service produces) and Pipeline Out
+(variables available to the next step). You can insert pipeline modifiers here
+to adjust results.
+
+---
+
+## BRANCH
+
+The BRANCH step conditionally executes a child step based on pipeline variable
+values. Two branching methods are available:
+
+**Switch value branching:** Uses a single String variable to determine which child
+step executes. The BRANCH step matches the Switch variable's value against each
+child step's Label property and executes the matching child.
+
+**Expression branching:** When Evaluate labels is True, each child step's Label
+contains a conditional expression. The BRANCH executes the first child whose
+label expression evaluates to True.
+
+IMPORTANT: You cannot branch on a switch value and an expression for the same
+BRANCH step.
+
+### Branching on Switch Values
+Define the switch variable in the BRANCH step's Switch property. Each child step's
+Label specifies which switch value triggers its execution. Special labels:
+- Empty string (blank Label): matches empty string values
+- `$null`: matches null values
+- `$default`: matches any unmatched value (default/fallback case)
+
+### Branching on Expressions
+Set Evaluate labels to True. Write expressions in each child step's Label property
+that include pipeline variables. At run time, the BRANCH executes the first child
+whose expression evaluates to True. Use `$default` label for the fallback case.
+
+### BRANCH Properties
+
+| Property | Required | Description |
+|----------|----------|-------------|
+| Comments | No | Descriptive comment for the step. |
+| Scope | No | Document (IData) name to restrict scope. Leave blank for full pipeline access. |
+| Timeout | No | Max seconds for execution. FlowTimeoutException on expiry. Supports `%variable%` substitution. |
+| Label | No (Yes if used as BRANCH/EXIT target) | Name for this step instance, or `$null`, `$default`, blank. |
+| Switch | Conditional | String field whose value determines which child executes. Do not set if Evaluate labels is True. |
+| Evaluate labels | Conditional | True = branch on expressions in child labels. False = branch on Switch value. |
+
+### BRANCH Failure Conditions
+- The switch field is not in the pipeline and the BRANCH step does not contain a default child step or a child step to handle null values.
+- The matching child step fails.
+- The BRANCH step does not complete before the time-out period expires.
+
+---
+
+## LOOP
+
+The LOOP step repeats child steps once for each element in a specified input array.
+Useful for batch processing (e.g., processing each line item in a purchase order).
+
+Any flow step can be placed inside a LOOP, including nested LOOP steps. Steps
+within a LOOP are organized by indentation to show hierarchy.
+
+### Input Array
+Specify a pipeline array variable (String list, String table, document list, or
+Object list) as the input. The LOOP iterates once per element.
+
+### Output Collection
+Optionally specify an output array name. The server collects output from each
+iteration into an array. For example, if the loop produces a String variable
+named "InventoryStatus" each iteration, the server transforms it into an array
+containing all iterations' results.
+
+Note: An EXIT step configured to exit a LOOP or an iteration affects the output
+array contents.
+
+### Pipeline Behavior Inside LOOP
+Inside a LOOP body, arrays are reduced by one dimension:
+- Input: String list becomes String; String table becomes String list; document list becomes single document
+- Output: Similarly reduced. Each iteration produces one element; the server reassembles into an array.
+
+### LOOP Properties
+
+| Property | Required | Description |
+|----------|----------|-------------|
+| Comments | No | Descriptive comment. |
+| Scope | No | Document (IData) to restrict scope. Leave blank for full pipeline. |
+| Timeout | No | Max seconds. FlowTimeoutException on expiry. Supports `%variable%`. |
+| Label | No (Yes if BRANCH/EXIT target) | Step name, or `$null`, `$default`, blank. |
+| Input array | Yes | Pipeline array variable to iterate over (String list, String table, document list, or Object list). |
+| Output array | No | Field name for collecting iteration output. Server aggregates into array. |
+
+### LOOP Failure Conditions
+- The pipeline does not contain the input array.
+- The input field is not an array field.
+- A child step of the LOOP fails during any iteration.
+- The LOOP does not complete before the time-out period expires.
+
+---
+
+## MAP
+
+The MAP step adjusts pipeline contents at any point in a flow, independent of
+INVOKE steps. Capabilities:
+- Link (copy) values between pipeline fields
+- Remove (drop) fields from the pipeline
+- Set constant values for pipeline fields
+- Invoke transformers for document-to-document transformations
+- Initialize input values at the start of a flow service
+- Convert between document formats (XML to ebXML, etc.)
+
+Tip: To initialize variables, insert a MAP step at the beginning of the flow
+and use Set Value to assign values in Pipeline Out.
+
+### Pipeline View for MAP
+Shows a single stage with three columns:
+- **Pipeline In:** All variables in the pipeline at this point in the flow.
+- **Transformers:** Services inserted for value transformations.
+- **Pipeline Out:** Variables available after the MAP step completes.
+
+When first inserted, Pipeline In and Pipeline Out contain identical variables.
+If the MAP is the last step, Pipeline Out also includes variables declared as
+flow service output.
+
+### MAP Properties
+
+| Property | Required | Description |
+|----------|----------|-------------|
+| Comments | No | Descriptive comment. |
+| Scope | No | Document (IData) to restrict scope. Leave blank for full pipeline. |
+| Timeout | No | Max seconds. FlowTimeoutException on expiry. Supports `%variable%`. |
+| Label | No (Yes if BRANCH/EXIT target) | Step name, or `$null`, `$default`, blank. |
+
+### MAP Use Cases
+1. Assign initial input values (initialize variables) at the start of a flow.
+2. Map a document from one format to another using transformers (e.g., cXML to XML).
+
+---
+
+## SEQUENCE
+
+The SEQUENCE step groups multiple flow steps that execute in order. While flow
+services execute steps sequentially by default, explicit SEQUENCE is useful for:
+- Grouping steps as a single alternative beneath a BRANCH step
+- Specifying exit conditions (exit on first failure, first success, or after all complete)
+
+### SEQUENCE Properties
+
+| Property | Required | Description |
+|----------|----------|-------------|
+| Comments | No | Descriptive comment. |
+| Scope | No | Document (IData) to restrict scope. |
+| Timeout | No | Max seconds. FlowTimeoutException on expiry. Supports `%variable%`. |
+| Label | No (Yes if BRANCH/EXIT target) | Step name, or `$null`, `$default`, blank. |
+| Exit on | Yes | When to exit the SEQUENCE. See below. |
+
+### Exit on Values
+
+| Value | Behavior |
+|-------|----------|
+| FAILURE | Exit when a child step fails. The SEQUENCE executes children until one fails or all complete. This is the default. |
+| SUCCESS | Exit when a child step succeeds or after all fail. Executes children until one succeeds or all fail. |
+| DONE | Execute ALL child steps regardless of success/failure. |
+
+IMPORTANT: Successful execution of a MAP step (including transformers) does NOT
+cause the SEQUENCE to exit when Exit on = SUCCESS.
+
+If a SEQUENCE contains an EXIT step configured to exit from the SEQUENCE,
+the EXIT always causes exit regardless of the Exit on setting.
+
+### SEQUENCE Failure Conditions
+- **Exit on FAILURE:** Fails if a child step fails, or timeout expires.
+- **Exit on SUCCESS:** Fails if ALL child steps fail, or timeout expires.
+- **Exit on DONE:** Fails only if timeout expires.
+
+---
+
+## REPEAT
+
+The REPEAT step executes child steps repeatedly, up to a specified count.
+Behavior depends on the repeat condition:
+- Repeat on FAILURE: Re-execute when any child step fails (retry pattern)
+- Repeat on SUCCESS: Re-execute when all child steps succeed (polling pattern)
+
+A configurable delay (repeat interval) can be set between re-executions.
+
+### REPEAT Properties
+
+| Property | Required | Description |
+|----------|----------|-------------|
+| Comments | No | Descriptive comment. |
+| Scope | No | Document (IData) to restrict scope. |
+| Timeout | No | Max seconds. FlowTimeoutException on expiry. Supports `%variable%`. |
+| Label | No (Yes if BRANCH/EXIT target) | Step name, or `$null`, `$default`, blank. |
+| Count | Yes | Max re-executions. 0 = no re-execution; positive integer = that many retries; -1 = unlimited (repeat as long as condition holds). Supports `%variable%`. |
+| Repeat interval | No | Seconds to wait before re-executing. 0 = no delay. Supports `%variable%`. |
+| Repeat on | Yes | SUCCESS = re-execute when all children succeed. FAILURE = re-execute when any child fails. |
+
+### REPEAT Failure Conditions
+- **Repeat on SUCCESS:** Fails when a child within the REPEAT block fails.
+- **Repeat on FAILURE:** Fails when the Count limit is reached before children execute successfully.
+
+When a REPEAT step fails as a child of another step, the failure propagates to the parent.
+
+---
+
+## EXIT
+
+The EXIT step terminates execution at various levels: the entire flow service,
+a specific ancestor step, or a single loop iteration. It can optionally throw an
+exception when the exit represents a failure.
+
+### EXIT Properties
+
+| Property | Required | Description |
+|----------|----------|-------------|
+| Comments | No | Descriptive comment. |
+| Label | No (Yes if BRANCH target) | Step name, or `$null`, `$default`, blank. |
+| Exit from | Yes | Scope of exit (see values below). |
+| Signal | Yes | SUCCESS = exit cleanly. FAILURE = exit and throw exception. |
+| Failure name | No | Fully qualified Java class name for the exception (e.g., `java.lang.Exception`, `com.wm.app.b2b.server.ServiceException`). Must extend java.lang.Exception. Default: `com.wm.lang.flow.FlowException` for $flow, `com.wm.lang.FlowFailure` for others. Supports `%variable%`. |
+| Failure instance | No | Pipeline variable (Object type) containing an existing Exception instance (typically from `pub.flow:getLastFailureCaught`). If both Failure name and Failure instance are set, Failure instance is used. |
+| Failure message | No | Exception message text. Supports `%variable%` substitution. |
+
+### Exit from Values
+
+| Value | Exits... |
+|-------|----------|
+| `$parent` | Parent flow step (default). |
+| `$loop` | Nearest ancestor LOOP or REPEAT step. |
+| `$flow` | Entire flow service. |
+| `$iteration` | Current iteration of nearest ancestor LOOP or REPEAT. |
+| *label* | Nearest ancestor step whose Label matches this value. If no match, flow exits with exception. |
+| *(blank)* | Same as `$loop`. |
+
+Note: Failure name and Failure instance properties are only used when Signal = FAILURE.
+
+---
+
+## Data Mapping in Flow Services
+
+Systems frequently require data transformations for compatible data exchange.
+The webMethods flow language supports three transformation types:
+
+### Name Transformations
+Resolve differences in how data is named. Example: copying "telephone" to
+"phoneNumber" while preserving value and position.
+
+### Structural Transformations
+Resolve differences in data type or structure. Example: moving a telephone
+number from a flat String field into a nested Document structure.
+
+### Value Transformations
+Resolve differences in how values are expressed. Examples: currency codes,
+date formats, measurement unit conversions.
+
+### Implementation Methods
+Two approaches:
+1. **Variable links** between services (MAPCOPY - copy value from one field to another)
+2. **Transformers** (specialized services inserted into MAP steps for value transformation)
+
+### Basic Mapping Operations
+1. **Link variables** - Copy values between fields across services or document formats (MAPCOPY)
+2. **Assign values** - Hard-code values or set defaults for pipeline variables (MAPSET)
+3. **Drop variables** - Remove unneeded pipeline variables (MAPDELETE)
+4. **Add variables** - Introduce variables not in original input/output declarations
+
+### What Is a Flow Service?
+A flow service is written in the webMethods flow language. It combines multiple
+services into a single unified service while controlling data flow between them.
+Any service type can be invoked within a flow: other flow services, built-in
+Integration Server services, adapter services, web service connectors.
+Flow services are stored as XML files on the Integration Server.
+IMPORTANT: Create and maintain flow services using Designer. You cannot create
+or edit a flow service with a text editor (unless using the putNode API).
+
+### What Is the Pipeline?
+The pipeline is the data structure (IData object) that flows through a service,
+carrying input variables, intermediate results, and output variables. Each flow
+step can read from and write to the pipeline. Pipeline modifiers (link, set,
+drop, add) adjust pipeline contents at each step boundary.
+"#;
+
+const BUILTIN_SERVICES_REF: &str = r#"# webMethods IS Built-In Services Reference
+
+Compact reference for AI-assisted flow service generation. All services are in the WmPublic package.
+All String-type numeric parameters use locale-neutral format (`-####.##`).
+
+---
+
+## pub.string (String Folder)
+
+### pub.string:concat
+Concatenates two strings.
+- **In:** `inString1` (String, req), `inString2` (String, req)
+- **Out:** `value` (String) - inString1 + inString2
+
+### pub.string:indexOf
+Returns index of first occurrence of a substring.
+- **In:** `inString` (String, req), `subString` (String, req), `fromIndex` (String, opt, default 0)
+- **Out:** `value` (String) - index, or -1 if not found
+
+### pub.string:substring
+Extracts a substring.
+- **In:** `inString` (String, req), `beginIndex` (String, req, inclusive), `endIndex` (String, opt, exclusive; if null extends to end)
+- **Out:** `value` (String)
+
+### pub.string:replace
+Replaces all occurrences of a substring.
+- **In:** `inString` (String, req), `searchString` (String, req), `replaceString` (String, req; null/empty removes matches), `useRegex` (String, opt, default false; when true replaceString can use $1 etc.)
+- **Out:** `value` (String)
+
+### pub.string:length
+Returns string length.
+- **In:** `inString` (String, req), `encoding` (String, opt - IANA charset or "autodetect")
+- **Out:** `value` (String) - character count
+
+### pub.string:trim
+Trims leading/trailing whitespace.
+- **In:** `inString` (String, req)
+- **Out:** `value` (String)
+
+### pub.string:toLower
+Converts to lowercase.
+- **In:** `inString` (String, req)
+- **Out:** `value` (String)
+
+### pub.string:toUpper
+Converts to uppercase.
+- **In:** `inString` (String, req)
+- **Out:** `value` (String)
+
+### pub.string:compareStrings
+Case-sensitive string equality check.
+- **In:** `inString1` (String, opt, can be null), `inString2` (String, opt, can be null)
+- **Out:** `isEqual` (String) - "true" or "false" (both null = true)
+
+### pub.string:tokenize
+Splits string into list by delimiters.
+- **In:** `inString` (String, req), `delim` (String, req; null defaults to whitespace/tab/newline), `useRegex` (Boolean, opt, default false)
+- **Out:** `valueList` (String List)
+
+### pub.string:makeString
+Joins String List into single string with separator.
+- **In:** `elementList` (String List, req), `separator` (String, req)
+- **Out:** `value` (String)
+
+### pub.string:padLeft
+Pads string on left to specified length.
+- **In:** `inString` (String, req), `length` (String, req), `padChar` (String, req)
+- **Out:** `value` (String)
+
+### pub.string:padRight
+Pads string on right to specified length.
+- **In:** `inString` (String, req), `length` (String, req), `padChar` (String, req)
+- **Out:** `value` (String)
+
+### pub.string:base64Encode
+Converts bytes to Base64 string.
+- **In:** `bytes` (byte[], req), `useNewLine` (String, opt, default "true" - inserts linebreaks every 76 chars), `encoding` (String, opt, "ASCII" default or "UTF-8")
+- **Out:** `value` (String)
+
+### pub.string:base64Decode
+Decodes Base64 string to bytes.
+- **In:** `string` (String, req), `encoding` (String, opt, "ASCII" default or "UTF-8")
+- **Out:** `value` (byte[])
+
+### pub.string:HTMLEncode
+Replaces HTML-sensitive chars with entities.
+- **In:** `inString` (String, req)
+- **Out:** `value` (String)
+
+### pub.string:HTMLDecode
+Replaces HTML entities with native characters.
+- **In:** `inString` (String, req)
+- **Out:** `value` (String)
+
+### pub.string:URLEncode
+URL-encodes a string (application/x-www-form-urlencoded).
+- **In:** `inString` (String, req)
+- **Out:** `value` (String)
+
+### pub.string:URLDecode
+Decodes a URL-encoded string.
+- **In:** `inString` (String, req)
+- **Out:** `value` (String)
+
+### pub.string:numericFormat
+Formats a number into a pattern. Rounding mode: HALF_EVEN.
+- **In:** `num` (String, req), `pattern` (String, req - symbols: `0`=digit, `#`=optional digit, `.`=decimal, `,`=grouping, `%`=percent)
+- **Out:** `value` (String)
+
+### pub.string:messageFormat
+Formats strings into a message pattern.
+- **In:** `pattern` (String, req), `args` (String List, req)
+- **Out:** `value` (String)
+
+### pub.string:lookupDictionary
+Looks up key in a Hashtable.
+- **In:** `hashtable` (java.util.Hashtable, req), `key` (String, req, case-sensitive)
+- **Out:** `value` (String) - null if key not found
+
+### pub.string:lookupTable
+Locates key in a String Table.
+- **In:** `table` (String Table, req), `key` (String, req)
+- **Out:** `value` (String)
+
+### pub.string:bytesToString
+Converts byte array to String.
+- **In:** `bytes` (byte[], req), `encoding` (String, opt)
+- **Out:** `value` (String)
+
+### pub.string:stringToBytes
+Converts String to byte array.
+- **In:** `inString` (String, req), `encoding` (String, opt)
+- **Out:** `value` (byte[])
+
+### pub.string:isNullEmptyOrWhitespace
+Checks if string is null, empty, or only whitespace.
+- **In:** `inString` (String)
+- **Out:** `isNullEmptyOrWhitespace` (String) - "true"/"false"
+
+### pub.string:isNumber
+Checks if string can be converted to float.
+- **In:** `inString` (String)
+- **Out:** `isNumber` (String) - "true"/"false"
+
+### pub.string:isAlphanumeric
+Checks if string contains only A-Z, a-z, 0-9.
+- **In:** `inString` (String)
+- **Out:** `isAlphanumeric` (String) - "true"/"false"
+
+### pub.string:isDate
+Checks if string matches a date format pattern.
+- **In:** `inString` (String), `pattern` (String)
+- **Out:** `isDate` (String) - "true"/"false"
+
+### pub.string:objectToString
+Converts object via Java toString().
+- **In:** `object` (Object, req)
+- **Out:** `value` (String)
+
+### pub.string:substitutePipelineVariables
+Replaces pipeline variable references with their values.
+- **In:** `inString` (String, req)
+- **Out:** `value` (String)
+
+---
+
+## pub.math (Math Folder)
+
+All numeric inputs/outputs are Strings (locale-neutral format `-####.##`) unless noted as java.lang.Number.
+Float operations support optional `precision` (String) for decimal places.
+Special float outputs: `Infinity`, `-Infinity`, `0.0`, `NaN`.
+
+### Arithmetic - Integers
+| Service | In | Out (`value` String) |
+|---|---|---|
+| `pub.math:addInts` | `num1`, `num2` (String) | num1 + num2 |
+| `pub.math:subtractInts` | `num1`, `num2` (String) | num1 - num2 |
+| `pub.math:multiplyInts` | `num1`, `num2` (String) | num1 * num2 |
+| `pub.math:divideInts` | `num1`, `num2` (String) | num1 / num2 |
+
+### Arithmetic - Floats
+| Service | In | Out (`value` String) |
+|---|---|---|
+| `pub.math:addFloats` | `num1`, `num2`, `precision`(opt) | num1 + num2 |
+| `pub.math:subtractFloats` | `num1`, `num2`, `precision`(opt) | num1 - num2 |
+| `pub.math:multiplyFloats` | `num1`, `num2`, `precision`(opt) | num1 * num2 |
+| `pub.math:divideFloats` | `num1`(dividend), `num2`(divisor), `precision`(opt) | num1 / num2 |
+
+### Arithmetic - Objects (java.lang.Number)
+| Service | In | Out (`value` java.lang.Number) |
+|---|---|---|
+| `pub.math:addObjects` | `num1`, `num2` (Number) | sum |
+| `pub.math:subtractObjects` | `num1`, `num2` (Number) | difference |
+| `pub.math:multiplyObjects` | `num1`, `num2` (Number) | product |
+| `pub.math:divideObjects` | `num1`, `num2` (Number) | quotient |
+
+Binary numeric promotion: Double > Float > Long > Integer.
+
+### List Operations
+| Service | In | Out (`value` String) |
+|---|---|---|
+| `pub.math:addIntList` | `numList` (String List) | sum |
+| `pub.math:addFloatList` | `numList` (String List) | sum |
+| `pub.math:multiplyIntList` | `numList` (String List) | product |
+| `pub.math:multiplyFloatList` | `numList` (String List) | product |
+
+### Other Math Services
+
+**pub.math:absoluteValue** - Returns absolute value.
+- **In:** `num` (String, req)
+- **Out:** `value` (String)
+
+**pub.math:max** - Returns largest number from list.
+- **In:** `numList` (String List, req)
+- **Out:** `maxValue` (String)
+
+**pub.math:min** - Returns smallest number from list.
+- **In:** `numList` (String List, req)
+- **Out:** `minValue` (String)
+
+**pub.math:roundNumber** - Rounds a number.
+- **In:** `num` (String, req), `numberOfDigits` (String, req), `roundingMode` (String, opt, default "RoundHalfUp"; values: RoundHalfUp, RoundUp, RoundDown, RoundCeiling, RoundFloor, RoundHalfDown, RoundHalfEven)
+- **Out:** `roundedNumber` (String)
+
+**pub.math:randomDouble** - Returns pseudorandom double 0.0-1.0.
+- **In:** (none)
+- **Out:** `number` (String)
+
+**pub.math:toNumber** - Converts string to numeric data type.
+- **In:** `num` (String, req)
+- **Out:** `value` (java.lang.Number)
+
+---
+
+## pub.list (List Folder)
+
+### pub.list:appendToDocumentList
+Appends documents to a document list. Appends references, not copies.
+- **In:** `toList` (Document List, opt - creates new if absent), `fromList` (Document List, opt), `fromItem` (Document, opt; added after fromList items)
+- **Out:** `toList` (Document List)
+
+### pub.list:appendToStringList
+Appends strings to a string list. Appends references, not copies.
+- **In:** `toList` (String List, opt - creates new if absent; null throws NPE), `fromList` (String List, opt), `fromItem` (String, opt; added after fromList items)
+- **Out:** `toList` (String List)
+
+### pub.list:sizeOfList
+Returns element count of a list.
+- **In:** `fromList` (Document List | String List | Object List, opt - default size 0)
+- **Out:** `size` (String), `fromList` (original list passthrough)
+
+### pub.list:stringListToDocumentList
+Converts String List to Document List.
+- **In:** `fromList` (String List, req)
+- **Out:** `toList` (Document List)
+
+### pub.list:addItemToVector
+Adds item(s) to a java.util.Vector.
+- **In:** `vector` (java.util.Vector), `item` (Object), `items` (Object List)
+- **Out:** `vector` (java.util.Vector)
+
+### pub.list:vectorToArray
+Converts java.util.Vector to an array.
+- **In:** `vector` (java.util.Vector)
+- **Out:** `array` (Object[])
+
+---
+
+## pub.date (Date Folder)
+
+### Date Pattern Symbols
+`yyyy`=year, `MM`=month(01-12), `dd`=day, `HH`=hour(00-23), `hh`=hour(01-12), `mm`=minute, `ss`=second, `SSS`=millisecond, `a`=AM/PM, `z`/`Z`=timezone.
+Example: `yyyy-MM-dd HH:mm:ss.SSS`, `yyyyMMdd`, `MM/dd/yyyy`
+
+Invalid dates auto-correct (e.g. Feb 30 -> Mar 2). Two-digit years use 50-year moving window.
+
+### pub.date:getCurrentDate
+Returns current date as Date object.
+- **In:** (none)
+- **Out:** `date` (java.util.Date)
+
+### pub.date:getCurrentDateString
+Returns current date as formatted string.
+- **In:** `pattern` (String, req), `timezone` (String, opt - e.g. "EST", "America/New_York"), `locale` (String, opt - e.g. "en", "fr")
+- **Out:** `value` (String)
+
+### pub.date:formatDate
+Formats a Date object as a string.
+- **In:** `date` (java.util.Date, opt), `pattern` (String, req), `timezone` (String, opt), `locale` (String, opt)
+- **Out:** `value` (String)
+
+### pub.date:dateTimeFormat
+Converts date/time string from one format to another.
+- **In:** `inString` (String, req), `currentPattern` (String, req), `newPattern` (String, req), `locale` (String, opt), `lenient` (String, opt, default "true")
+- **Out:** `value` (String)
+
+### pub.date:dateBuild
+Builds date string from components. (Deprecated - use pub.datetime:build)
+- **In:** `pattern` (String, req), `year` (String, opt, yyyy/yy), `month` (String, opt, 1-12), `dayofmonth` (String, opt)
+- **Out:** `value` (String)
+
+### pub.date:dateTimeBuild
+Builds date/time string from components. (Deprecated - use pub.datetime:build)
+- **In:** `pattern` (String, req), `year` (String, opt), `month` (String, opt), `dayofmonth` (String, opt), `hour` (String, opt, 0-23), `minute` (String, opt), `second` (String, opt), `timezone` (String, opt), `locale` (String, opt)
+- **Out:** `value` (String)
+
+### pub.date:compareDates
+Compares two dates.
+- **In:** `startDate` (String, req), `endDate` (String, req), `startDatePattern` (String, req), `endDatePattern` (String, req)
+- **Out:** `result` (String) - "+1" if startDate after endDate, "0" if equal, "-1" if startDate before endDate
+
+### pub.date:calculateDateDifference
+Calculates difference between two dates. Each output is the SAME difference in different units (do NOT add them).
+- **In:** `startDate` (String, req), `endDate` (String, req), `startDatePattern` (String, req), `endDatePattern` (String, req)
+- **Out:** `dateDifferenceSeconds` (String), `dateDifferenceMinutes` (String), `dateDifferenceHours` (String), `dateDifferenceDays` (String) - all truncated to whole numbers
+
+### pub.date:currentNanoTime
+Returns current time in nanoseconds (high-precision timer).
+- **In:** (none)
+- **Out:** `nanoTime` (String)
+
+### pub.date:elapsedNanoTime
+Calculates elapsed nanoseconds since a given time.
+- **In:** `startNanoTime` (String, req)
+- **Out:** `elapsedNanoTime` (String)
+
+### pub.date:getWorkingDays
+Returns working days between two dates.
+- **In:** `startDate` (String, req), `endDate` (String, req), `startDatePattern` (String, req), `endDatePattern` (String, req)
+- **Out:** `workingDays` (String)
+
+### pub.date:incrementDate
+Increments date by time intervals. (Deprecated - use pub.datetime:increment)
+- **In:** `startDate` (String), `pattern` (String), `years`/`months`/`days`/`hours`/`minutes`/`seconds` (String, opt)
+- **Out:** `value` (String)
+
+---
+
+## pub.flow (Flow Folder)
+
+### pub.flow:debugLog
+Writes message to server log.
+- **In:** `message` (String, opt), `function` (String, opt - source identifier), `level` (String, opt - Off/Fatal(default)/Error/Warn/Info/Debug/Trace)
+- **Out:** (none)
+- **Note:** Visibility controlled by logging level for facility "0090 pub Flow services"
+
+### pub.flow:getLastError
+Gets info about last trapped exception in a flow. Must be first step in catch block.
+- **In:** (none)
+- **Out:** `lastError` (Document) - structure per pub.event:exceptionInfo; contains error, errorType, errorDump, errorMessage, localizedError, nestedError, etc.
+- **Constraints:** Only callable from flow services. Map lastError to pipeline variable immediately if needed by subsequent steps. Does NOT capture EXIT step failures.
+
+### pub.flow:getLastFailureCaught
+Returns failure details from CATCH steps.
+- **In:** (none)
+- **Out:** failure details document
+
+### pub.flow:clearPipeline
+Removes all fields from the pipeline.
+- **In:** `preserve` (String List, opt - field names to keep)
+- **Out:** (none)
+
+### pub.flow:throwExceptionForRetry
+Throws ISRuntimeException to trigger service retry. For transient errors only.
+- **In:** `wrappedException` (Object, opt), `message` (String, opt)
+- **Out:** (none)
+- **Constraints:** Only top-level or trigger services can be retried. Nested services cannot.
+
+### pub.flow:invokeService
+Dynamically invokes any public IS service.
+- **In:** `ifcname` (String, req - e.g. "pub.math"), `svcname` (String, req - e.g. "addInts"), `pipeline` (Document, opt)
+- **Out:** varies by invoked service; when pipeline specified, output appears in that pipeline document
+- **Throws:** ServiceException if interface or service not found
+
+### pub.flow:savePipeline
+Saves pipeline snapshot to memory.
+- **In:** `$name` (String, req)
+- **Out:** (none)
+- **Note:** Not persisted across server restarts. For debugging.
+
+### pub.flow:restorePipeline
+Restores previously saved pipeline.
+- **In:** `$name` (String, req), `$merge` (String, opt, default "false"), `$remove` (String, opt, default "false" - remove saved copy after restore)
+- **Out:** restored pipeline contents
+
+### pub.flow:savePipelineToFile
+Saves pipeline to server file.
+- **In:** `fileName` (String, req - relative path)
+- **Out:** (none)
+
+### pub.flow:restorePipelineFromFile
+Restores pipeline from file.
+- **In:** `fileName` (String, req), `merge` (String, opt, default "false")
+- **Out:** restored pipeline contents
+
+### pub.flow:getTransportInfo
+Gets protocol info for how current service was invoked.
+- **In:** (none)
+- **Out:** `transport` (Document) - contains `protocol` key (e.g. "http", "email") and protocol-specific sub-document
+- **Constraint:** Only works for top-level services
+
+### pub.flow:getSession
+Inserts session object into pipeline.
+- **In:** (none)
+- **Out:** `$session` (Document) - current user session info
+
+### pub.flow:getRetryCount
+Gets retry count for current service execution.
+- **In:** (none)
+- **Out:** `retryCount` (String), `maxRetryCount` (String; -1 = retry-until-success trigger)
+
+### pub.flow:getCallingService
+Gets parent service info.
+- **In:** (none)
+- **Out:** calling service name and package info
+
+### pub.flow:setResponse
+(Deprecated - use setResponse2) Returns response to caller.
+- **In:** `response` (String, req), `contentType` (String, opt - MIME type), `encoding` (String, opt)
+- **Out:** (none)
+
+### pub.flow:setResponse2
+Returns response to calling process. Replaces setResponse.
+- **In:** `response` (String), `contentType` (String, opt), `encoding` (String, opt)
+- **Out:** (none)
+
+### pub.flow:setResponseCode
+Sets HTTP response code.
+- **In:** `code` (String, req - e.g. "200", "404", "500")
+- **Out:** (none)
+
+### pub.flow:setResponseHeader
+Sets single HTTP response header.
+- **In:** `key` (String, req), `value` (String, req)
+- **Out:** (none)
+
+### pub.flow:setResponseHeaders
+Sets multiple HTTP response headers.
+- **In:** `headers` (Document, req)
+- **Out:** (none)
+
+### pub.flow:tracePipeline
+Writes pipeline field names and values to server log.
+- **In:** (none)
+- **Out:** (none) - output goes to server log
+
+### pub.flow:iterator
+Returns IData arrays in batches.
+- **In:** batch size and array input
+- **Out:** batched array segments
+
+---
+
+## Kafka / Streaming Integration
+
+### Kafka Listener Configuration
+webMethods IS can monitor Kafka topics via the Apache Kafka connector.
+
+**Setup:** Events > Listeners > Kafka type
+- **Connection:** Select a consumer connection (must be pre-configured)
+- **Topic Name(s):** Comma-separated Kafka topic names
+- **Poll Interval:** Milliseconds between checks (default: 10000ms)
+- **Partition(s):** Comma-separated partition identifiers (optional)
+- **Offset(s):** Starting consumption point per partition (optional; ignored without partitions)
+- **Retry Limit:** Reconnection attempts on failure (default: 5)
+- **Retry Backoff:** Milliseconds between retries (default: 10ms)
+
+**Message Flow:** Listener fetches messages from Kafka topic and passes them to associated listener notifications for processing by flow services.
+
+**Constraints:**
+- Offset count cannot exceed partition count
+- Multiple topic subscriptions do not support multiple partitions or offsets
+- Requires pre-configured Kafka consumer account
+
+### Messaging Model
+webMethods supports publish-and-subscribe, request/reply, and publish-and-wait patterns. Messaging providers include:
+- **Internal:** Built into IS for flow services and workflows
+- **Universal Messaging:** Self-hosted webMethods messaging broker
+- **External:** JMS connectors for IBM MQ, Apache Kafka, etc.
 "#;
