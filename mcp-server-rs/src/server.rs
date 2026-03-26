@@ -2808,6 +2808,257 @@ impl WmServer {
         }
     }
 
+    #[tool(
+        description = "Download and install a package from the webMethods Package Registry into the IS.\n\nThis downloads the package zip from GitHub, extracts it into the IS packages directory, and activates it. Requires the MCP server to have filesystem access to the IS installation.\n\nIf tag is omitted, the latest version is installed."
+    )]
+    async fn marketplace_install(
+        &self,
+        Parameters(p): Parameters<MarketplaceInstallParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c
+            .marketplace_install(&p.package_name, p.tag.as_deref(), p.registry.as_deref())
+            .await
+        {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    // ── Pub/Sub Trigger Management ──────────────────────────────────────
+
+    #[tool(description = "List all pub/sub triggers with their status, connection, and settings.")]
+    async fn trigger_report(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.trigger_report().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Create a pub/sub trigger.\n\nRequired settings: triggerName (full ns path), package.\nKey fields: conditions (array with conditionName, serviceName, messageType array, filter array), joinTimeOut, queueCapacity, maxRetryAttempts, retryInterval, isConcurrent, maxExecutionThreads."
+    )]
+    async fn trigger_create(
+        &self,
+        Parameters(p): Parameters<TriggerCreateParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let settings = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.trigger_create(&settings).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Delete a pub/sub trigger.")]
+    async fn trigger_delete(
+        &self,
+        Parameters(p): Parameters<TriggerNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.trigger_delete(&p.trigger_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Get properties of a pub/sub trigger (queue capacity, retry, threading, etc.)."
+    )]
+    async fn trigger_get_properties(
+        &self,
+        Parameters(p): Parameters<TriggerNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.trigger_get_properties(&p.trigger_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Update properties of a pub/sub trigger.")]
+    async fn trigger_set_properties(
+        &self,
+        Parameters(p): Parameters<TriggerSetPropertiesParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let props = match parse_json(&p.properties) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.trigger_set_properties(&p.trigger_name, &props).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Suspend a pub/sub trigger (stops processing new documents).")]
+    async fn trigger_suspend(
+        &self,
+        Parameters(p): Parameters<TriggerNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.trigger_suspend(&p.trigger_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Get processing status of a trigger (active threads, queue counts, state)."
+    )]
+    async fn trigger_processing_status(
+        &self,
+        Parameters(p): Parameters<TriggerNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.trigger_processing_status(&p.trigger_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Get retrieval status of a trigger (document retrieval state).")]
+    async fn trigger_retrieval_status(
+        &self,
+        Parameters(p): Parameters<TriggerNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.trigger_retrieval_status(&p.trigger_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Get execution statistics for a trigger (consume/process counts, latency)."
+    )]
+    async fn trigger_stats(
+        &self,
+        Parameters(p): Parameters<TriggerNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.trigger_stats(&p.trigger_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    // ── Messaging Connections ──────────────────────────────────────────
+
+    #[tool(description = "List all messaging connection aliases (UM, Local) with their status.")]
+    async fn messaging_connection_list(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.messaging_connection_list().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Create a messaging connection alias.\n\nRequired settings: aliasName, type (UM for Universal Messaging, LOCAL for local). For UM: um_rname (nsp://host:port). Optional: description, enabled, clientID, csqSize."
+    )]
+    async fn messaging_connection_create(
+        &self,
+        Parameters(p): Parameters<MessagingConnectionCreateParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let settings = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.messaging_connection_create(&settings).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Delete a messaging connection alias.")]
+    async fn messaging_connection_delete(
+        &self,
+        Parameters(p): Parameters<MessagingConnectionNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.messaging_connection_delete(&p.alias_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Enable a messaging connection alias.")]
+    async fn messaging_connection_enable(
+        &self,
+        Parameters(p): Parameters<MessagingConnectionNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.messaging_connection_enable(&p.alias_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Disable a messaging connection alias.")]
+    async fn messaging_connection_disable(
+        &self,
+        Parameters(p): Parameters<MessagingConnectionNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.messaging_connection_disable(&p.alias_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "List all publishable document types (documents that can be published to messaging)."
+    )]
+    async fn messaging_publishable_doctypes(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.messaging_publishable_doctypes().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Get the client-side queue (CSQ) message count for a messaging connection."
+    )]
+    async fn messaging_csq_count(
+        &self,
+        Parameters(p): Parameters<MessagingConnectionNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.messaging_csq_count(&p.alias_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Clear the client-side queue (CSQ) for a messaging connection.")]
+    async fn messaging_csq_clear(
+        &self,
+        Parameters(p): Parameters<MessagingConnectionNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.messaging_csq_clear(&p.alias_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────
 
     #[tool(

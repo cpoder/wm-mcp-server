@@ -18,6 +18,7 @@ pub mod scheduler;
 pub mod security;
 pub mod services;
 pub mod streaming;
+pub mod triggers;
 pub mod users;
 
 pub use adapters::*;
@@ -40,6 +41,7 @@ pub use scheduler::*;
 pub use security::*;
 pub use services::*;
 pub use streaming::*;
+pub use triggers::*;
 pub use users::*;
 
 pub mod webservices;

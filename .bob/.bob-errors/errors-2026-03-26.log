@@ -1,0 +1,15 @@
+
+================================================================================
+ERROR LOGGED: 2026-03-26T09:43:25.078Z
+================================================================================
+Error Name: Error
+Error Message: Missing authorization code
+
+Stack Trace:
+Error: Missing authorization code
+    at Server.<anonymous> (file:///home/cpo/.nvm/versions/node/v24.14.1/lib/node_modules/bobshell/bundle/bob.js:2107:209)
+    at Server.emit (node:events:508:28)
+    at parserOnIncoming (node:_http_server:1210:12)
+    at HTTPParser.parserOnHeadersComplete (node:_http_common:125:17)
+================================================================================
+

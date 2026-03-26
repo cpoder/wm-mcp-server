@@ -534,8 +534,58 @@ check "marketplace_package_info" "$out" "JcPublicTools\|description\|sourceUrl"
 
 # marketplace_package_tags tested manually (external HTTPS call can exceed mcp_call timeout)
 
+# Full install + verify + cleanup (takes ~10s to download from GitHub)
+# Using a longer timeout via sleep in the mcp_call
+out=$((printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}\n'; sleep 0.3; printf '{"jsonrpc":"2.0","method":"notifications/initialized"}\n'; sleep 0.3; printf '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"marketplace_install","arguments":{"package_name":"JcPublicTools","tag":"v2.1.0"}}}\n'; sleep 15) | timeout 30 "$BIN" 2>/dev/null | python3 -c "
+import sys, json
+for line in sys.stdin:
+    d = json.loads(line.strip())
+    if d.get('id') == 2:
+        content = d.get('result',{}).get('content',[])
+        if content: print(content[0].get('text',''))
+        break
+")
+check "marketplace_install" "$out" "installed\|JcPublicTools"
+
+# Verify package is loaded
+out=$(mcp_call 2 "package_info" '{"package_name":"JcPublicTools"}')
+check "marketplace_install_verify" "$out" "JcPublicTools\|services"
+
+# Cleanup - delete installed package
+out=$(mcp_call 2 "package_delete" '{"package_name":"JcPublicTools"}')
+check "marketplace_install_cleanup" "$out" "deleted\|JcPublicTools"
+
 out=$(mcp_call 2 "marketplace_package_git" '{"package_name":"JcPublicTools"}')
 check "marketplace_package_git" "$out" "repoOwner\|html_url\|github"
+
+# ── Pub/Sub Triggers (full lifecycle) ─────────────────────────
+echo "--- Pub/Sub Triggers ---"
+out=$(mcp_call 2 "trigger_report" '{}')
+check "trigger_report" "$out" "triggers\|globalSettings"
+
+# Get properties of an existing trigger
+out=$(mcp_call 2 "trigger_get_properties" '{"trigger_name":"DemoBPMProcess.demoProcess.Default:subscriptionTrigger"}')
+check "trigger_get_properties" "$out" "joinTimeOut\|queueCapacity\|maxRetryAttempts"
+
+# Get processing status
+out=$(mcp_call 2 "trigger_processing_status" '{"trigger_name":"DemoBPMProcess.demoProcess.Default:subscriptionTrigger"}')
+check "trigger_processing_status" "$out" "state\|activeThreadCount"
+
+# Get trigger stats
+out=$(mcp_call 2 "trigger_stats" '{"trigger_name":"DemoBPMProcess.demoProcess.Default:subscriptionTrigger"}')
+check "trigger_stats" "$out" "assetStats\|categories"
+
+# ── Messaging Connections ────────────────────────────────────
+echo "--- Messaging Connections ---"
+out=$(mcp_call 2 "messaging_connection_list" '{}')
+check "messaging_connection_list" "$out" "aliasDataList\|IS_UM_CONNECTION\|IS_LOCAL_CONNECTION"
+
+out=$(mcp_call 2 "messaging_publishable_doctypes" '{}')
+check "messaging_publishable_doctypes" "$out" "publishableDocumentTypes"
+
+# CSQ count on default local connection
+out=$(mcp_call 2 "messaging_csq_count" '{"alias_name":"IS_LOCAL_CONNECTION"}')
+check_not_empty "messaging_csq_count" "$out"
 
 # ── Prompts ──────────────────────────────────────────────────
 echo "--- Prompts ---"

@@ -22,6 +22,7 @@ mod scheduler;
 mod security;
 mod services;
 mod streaming;
+mod triggers;
 mod users;
 mod webservices;
 
