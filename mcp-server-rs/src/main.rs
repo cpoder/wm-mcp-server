@@ -2,6 +2,7 @@ mod client;
 mod config;
 mod params;
 mod prompts;
+mod resources;
 mod server;
 
 use client::ISClient;

@@ -3365,6 +3365,7 @@ impl ServerHandler for WmServer {
             ServerCapabilities::builder()
                 .enable_tools()
                 .enable_prompts()
+                .enable_resources()
                 .build(),
         )
             .with_server_info(Implementation::new(
@@ -3436,6 +3437,31 @@ impl ServerHandler for WmServer {
                 "- EXIT: {type:\"EXIT\", from:\"$flow\", signal:\"FAILURE\"}\n",
                 "- WmPath format: /fieldName;type;dim (type: 1=String, 2=Record, 3=Object, 4=RecordRef; dim: 0=scalar, 1=array)\n",
             ))
+    }
+
+    fn list_resources(
+        &self,
+        _request: Option<PaginatedRequestParams>,
+        _context: RequestContext<RoleServer>,
+    ) -> impl std::future::Future<Output = Result<ListResourcesResult, ErrorData>> + Send + '_ {
+        std::future::ready(Ok(ListResourcesResult {
+            resources: crate::resources::list(),
+            ..Default::default()
+        }))
+    }
+
+    fn read_resource(
+        &self,
+        request: ReadResourceRequestParams,
+        _context: RequestContext<RoleServer>,
+    ) -> impl std::future::Future<Output = Result<ReadResourceResult, ErrorData>> + Send + '_ {
+        std::future::ready(
+            crate::resources::read(&request.uri).ok_or_else(|| ErrorData {
+                code: ErrorCode::INVALID_PARAMS,
+                message: Cow::Owned(format!("Unknown resource: {}", request.uri)),
+                data: None,
+            }),
+        )
     }
 
     fn list_prompts(

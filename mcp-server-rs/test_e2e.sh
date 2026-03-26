@@ -679,6 +679,35 @@ check "install_jars_cleanup" "$out" "deleted\|E2EMySQLJars"
 # Note: Full MySQL connection test validated manually:
 # install_jars with bounce=true -> IS restarts -> create JDBC pool -> test connection -> SUCCESS
 
+# ── Complex Flow: INVOKE + LOOP + Record Mapping ─────────────
+echo "--- Complex Flow (LOOP + RecordRef mapping) ---"
+# Create doc type, mock service, and a LOOP service that extracts fields from record array
+# This tests the critical MAPCOPY RecordRef (type 4) path format inside LOOP
+
+# Create searchAccounts mock (returns record array with RecordRef MAPSET)
+mcp_call 2 "flow_service_create" '{"package":"E2ETestPkg","service_path":"e2etest.loop:searchAccounts"}' > /dev/null 2>&1
+SEARCH_NODE='{"node_nsName":"e2etest.loop:searchAccounts","node_pkg":"E2ETestPkg","node_type":"service","svc_type":"flow","svc_subtype":"default","svc_sigtype":"java 3.5","stateless":"yes","pipeline_option":1,"svc_sig":{"sig_in":{"node_type":"record","field_type":"record","field_dim":"0","nillable":"true","javaclass":"com.wm.util.Values","rec_fields":[]},"sig_out":{"node_type":"record","field_type":"record","field_dim":"0","nillable":"true","javaclass":"com.wm.util.Values","rec_fields":[{"node_type":"record","field_name":"accounts","field_type":"record","field_dim":"1","nillable":"true","rec_fields":[{"node_type":"field","field_name":"accountName","field_type":"string","field_dim":"0","nillable":"true"},{"node_type":"field","field_name":"customerName","field_type":"string","field_dim":"0","nillable":"true"}]}]}},"flow":{"type":"ROOT","version":"3.2","cleanup":"true","nodes":[{"type":"MAP","mode":"STANDALONE","nodes":[{"type":"MAPSET","field":"/accounts;2;1","overwrite":"true","d_enc":"XMLValues","mapseti18n":"true","data":"<Values version=\"2.0\"><array name=\"xml\" type=\"record\" depth=\"1\"><record javaclass=\"com.wm.util.Values\"><value name=\"accountName\">acc1</value><value name=\"customerName\">Alice</value></record><record javaclass=\"com.wm.util.Values\"><value name=\"accountName\">acc2</value><value name=\"customerName\">Bob</value></record><record javaclass=\"com.wm.util.Values\"><value name=\"accountName\">acc3</value><value name=\"customerName\">Carol</value></record></array></Values>"}]}]}}'
+out=$(mcp_call 2 "put_node" "{\"node_data\":$(echo "$SEARCH_NODE" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read().strip()))')}")
+check "loop_create_searchAccounts" "$out" "ok\|status"
+
+# Verify mock returns 3 records
+out=$(mcp_call 2 "service_invoke" '{"service_path":"e2etest.loop:searchAccounts"}')
+check "loop_searchAccounts_returns_3" "$out" "Alice\|Bob\|Carol"
+
+# Create getCustomers service with LOOP using RecordRef (type 4) MAPCOPY
+mcp_call 2 "flow_service_create" '{"package":"E2ETestPkg","service_path":"e2etest.loop:getCustomers"}' > /dev/null 2>&1
+LOOP_NODE='{"node_nsName":"e2etest.loop:getCustomers","node_pkg":"E2ETestPkg","node_type":"service","svc_type":"flow","svc_subtype":"default","svc_sigtype":"java 3.5","stateless":"yes","pipeline_option":1,"svc_sig":{"sig_in":{"node_type":"record","field_type":"record","field_dim":"0","nillable":"true","javaclass":"com.wm.util.Values","rec_fields":[]},"sig_out":{"node_type":"record","field_type":"record","field_dim":"0","nillable":"true","javaclass":"com.wm.util.Values","rec_fields":[{"node_type":"field","field_name":"customers","field_type":"string","field_dim":"1","nillable":"true"}]}},"flow":{"type":"ROOT","version":"3.2","cleanup":"true","nodes":[{"type":"INVOKE","service":"e2etest.loop:searchAccounts","validate-in":"$none","validate-out":"$none"},{"type":"LOOP","in-array":"/accounts","out-array":"/customers","nodes":[{"type":"MAP","mode":"STANDALONE","nodes":[{"type":"MAPCOPY","from":"/accounts;4;0;e2etest.loop:account/customerName;1;0","to":"/customers;1;0"}]}]},{"type":"MAP","mode":"STANDALONE","nodes":[{"type":"MAPDELETE","field":"/accounts;4;1;e2etest.loop:account"}]}]}}'
+out=$(mcp_call 2 "put_node" "{\"node_data\":$(echo "$LOOP_NODE" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read().strip()))')}")
+check "loop_create_getCustomers" "$out" "ok\|status"
+
+# THE KEY TEST: invoke and verify LOOP extracted the customer names correctly
+out=$(mcp_call 2 "service_invoke" '{"service_path":"e2etest.loop:getCustomers"}')
+check "loop_customers_extracted" "$out" "Alice.*Bob.*Carol\|customers"
+
+# Cleanup
+mcp_call 2 "node_delete" '{"name":"e2etest.loop:getCustomers"}' > /dev/null 2>&1
+mcp_call 2 "node_delete" '{"name":"e2etest.loop:searchAccounts"}' > /dev/null 2>&1
+
 # ── Prompts ──────────────────────────────────────────────────
 echo "--- Prompts ---"
 for pname in setup_kafka_streaming setup_jdbc_connection setup_sap_connection setup_jms_connection setup_mqtt_connection setup_scheduled_task setup_rest_api setup_user_management setup_oauth; do
