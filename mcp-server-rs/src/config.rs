@@ -38,6 +38,9 @@ pub struct FileConfig {
 pub struct AppConfig {
     pub instances: HashMap<String, InstanceConfig>,
     pub default_instance: String,
+    /// Tool scopes to expose. Empty = all tools. Set via WM_SCOPES env var (comma-separated).
+    /// Valid scopes: admin, develop, adapters, messaging, monitor, deploy, network, readonly
+    pub scopes: Vec<String>,
 }
 
 impl AppConfig {
@@ -75,7 +78,20 @@ impl AppConfig {
         Ok(Self {
             instances: file.instances,
             default_instance,
+            scopes: Self::load_scopes(),
         })
+    }
+
+    fn load_scopes() -> Vec<String> {
+        std::env::var("WM_SCOPES")
+            .ok()
+            .map(|s| {
+                s.split(',')
+                    .map(|s| s.trim().to_lowercase())
+                    .filter(|s| !s.is_empty())
+                    .collect()
+            })
+            .unwrap_or_default()
     }
 
     fn from_env() -> Self {
@@ -96,6 +112,7 @@ impl AppConfig {
         Self {
             instances,
             default_instance: name,
+            scopes: Self::load_scopes(),
         }
     }
 }

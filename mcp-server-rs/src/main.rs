@@ -3,6 +3,7 @@ mod config;
 mod params;
 mod prompts;
 mod resources;
+mod scopes;
 mod server;
 
 use client::ISClient;
@@ -41,16 +42,21 @@ async fn main() -> anyhow::Result<()> {
         .and_then(|i| args.get(i + 1))
         .and_then(|p| p.parse::<u16>().ok());
 
+    if !config.scopes.is_empty() {
+        tracing::info!("Tool scopes: {:?}", config.scopes);
+    }
+
     if let Some(port) = http_port {
-        run_http(clients, config.default_instance, port).await
+        run_http(clients, config.default_instance, config.scopes, port).await
     } else {
-        run_stdio(clients, config.default_instance).await
+        run_stdio(clients, config.default_instance, config.scopes).await
     }
 }
 
 async fn run_stdio(
     clients: HashMap<String, Arc<ISClient>>,
     default_instance: String,
+    scopes: Vec<String>,
 ) -> anyhow::Result<()> {
     tracing::info!(
         "Starting MCP server (stdio, {} instance(s), default: '{}')",
@@ -59,6 +65,7 @@ async fn run_stdio(
     );
 
     let service = WmServer::new(clients, default_instance)
+        .with_scopes(scopes)
         .serve(stdio())
         .await?;
     service.waiting().await?;
@@ -68,6 +75,7 @@ async fn run_stdio(
 async fn run_http(
     clients: HashMap<String, Arc<ISClient>>,
     default_instance: String,
+    scopes: Vec<String>,
     port: u16,
 ) -> anyhow::Result<()> {
     use rmcp::transport::streamable_http_server::{
@@ -92,11 +100,15 @@ async fn run_http(
         ..Default::default()
     };
 
-    let service: StreamableHttpService<WmServer, LocalSessionManager> = StreamableHttpService::new(
-        move || Ok(WmServer::new(clients.clone(), default_instance.clone())),
-        Default::default(),
-        config,
-    );
+    let service: StreamableHttpService<WmServer, LocalSessionManager> =
+        StreamableHttpService::new(
+            move || {
+                Ok(WmServer::new(clients.clone(), default_instance.clone())
+                    .with_scopes(scopes.clone()))
+            },
+            Default::default(),
+            config,
+        );
 
     let router = axum::Router::new().nest_service("/mcp", service);
 

@@ -4,8 +4,8 @@ use crate::client::ISClient;
 use crate::params::*;
 use rmcp::{
     RoleServer, ServerHandler, handler::server::router::tool::ToolRouter,
-    handler::server::wrapper::Parameters, model::*, service::RequestContext, tool, tool_handler,
-    tool_router,
+    handler::server::tool::ToolCallContext, handler::server::wrapper::Parameters, model::*,
+    service::RequestContext, tool, tool_router,
 };
 use serde_json::{Value, json};
 use std::borrow::Cow;
@@ -49,6 +49,7 @@ pub struct WmServer {
     clients: HashMap<String, Arc<ISClient>>,
     default_instance: String,
     tool_router: ToolRouter<WmServer>,
+    scopes: Vec<String>,
 }
 
 impl WmServer {
@@ -74,7 +75,13 @@ impl WmServer {
             clients,
             default_instance,
             tool_router: Self::tool_router(),
+            scopes: Vec::new(),
         }
+    }
+
+    pub fn with_scopes(mut self, scopes: Vec<String>) -> Self {
+        self.scopes = scopes;
+        self
     }
 
     // ── Instance Management ────────────────────────────────────────────
@@ -3933,8 +3940,47 @@ impl WmServer {
     }
 }
 
-#[tool_handler]
 impl ServerHandler for WmServer {
+    fn list_tools(
+        &self,
+        _request: Option<PaginatedRequestParams>,
+        _context: RequestContext<RoleServer>,
+    ) -> impl std::future::Future<Output = Result<ListToolsResult, ErrorData>> + Send + '_ {
+        let all_tools = self.tool_router.list_all();
+        let filtered: Vec<Tool> = if self.scopes.is_empty() {
+            all_tools
+        } else {
+            all_tools
+                .into_iter()
+                .filter(|t| crate::scopes::is_tool_allowed(&t.name, &self.scopes))
+                .collect()
+        };
+        std::future::ready(Ok(ListToolsResult {
+            tools: filtered,
+            ..Default::default()
+        }))
+    }
+
+    async fn call_tool(
+        &self,
+        request: CallToolRequestParams,
+        context: RequestContext<RoleServer>,
+    ) -> Result<CallToolResult, ErrorData> {
+        if !self.scopes.is_empty()
+            && !crate::scopes::is_tool_allowed(&request.name, &self.scopes)
+        {
+            return Err(ErrorData {
+                code: ErrorCode::INVALID_PARAMS,
+                message: Cow::Owned(format!(
+                    "Tool '{}' is not available in the current scope(s): {:?}",
+                    request.name, self.scopes
+                )),
+                data: None,
+            });
+        }
+        let ctx = ToolCallContext::new(self, request, context);
+        self.tool_router.call(ctx).await
+    }
     fn get_info(&self) -> ServerInfo {
         ServerInfo::new(
             ServerCapabilities::builder()
