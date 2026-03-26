@@ -5,6 +5,7 @@
 
 mod adapters;
 mod auditing;
+mod flow_debug;
 mod global_vars;
 mod jdbc_pools;
 mod jms;

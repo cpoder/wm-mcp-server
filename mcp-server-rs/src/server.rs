@@ -3059,6 +3059,118 @@ impl WmServer {
         }
     }
 
+    // ── Flow Debugging ──────────────────────────────────────────────────
+
+    #[tool(
+        description = "Start a flow debugging session.\n\nLaunches the service in debug mode. Returns a debug_oid (session ID) and the first breakpoint. Use flow_debug_execute with commands like 'stepOver' to step through.\n\nThe response includes $pipeline (current pipeline state), $current (current step path), $triggeredBreakPoint, $callStack."
+    )]
+    async fn flow_debug_start(
+        &self,
+        Parameters(p): Parameters<FlowDebugStartParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let pipeline = match &p.pipeline {
+            Some(s) if !s.is_empty() => match parse_json(s) {
+                Ok(v) => Some(v),
+                Err(e) => return text_result(&format!("Invalid pipeline JSON: {e}")),
+            },
+            _ => None,
+        };
+        match c
+            .flow_debug_start(
+                &p.service,
+                pipeline.as_ref(),
+                p.stop_at_start.unwrap_or(true),
+            )
+            .await
+        {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Execute a debug command in a flow debugging session.\n\nCommands: stepOver (execute current step), stepIn (enter invoked service), stepOut (exit to caller), resume (run to next breakpoint), stop.\n\nReturns the updated $pipeline, $current step, and $triggeredBreakPoint."
+    )]
+    async fn flow_debug_execute(
+        &self,
+        Parameters(p): Parameters<FlowDebugCommandParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.flow_debug_execute(&p.debug_oid, &p.command).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Close a flow debugging session and release resources.")]
+    async fn flow_debug_close(
+        &self,
+        Parameters(p): Parameters<FlowDebugOidParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.flow_debug_close(&p.debug_oid).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Insert breakpoints in a debug session.")]
+    async fn flow_debug_insert_breakpoints(
+        &self,
+        Parameters(p): Parameters<FlowDebugBreakpointParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let bp = match parse_json(&p.breakpoints) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.flow_debug_insert_breakpoints(&p.debug_oid, &bp).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Remove all breakpoints from a debug session.")]
+    async fn flow_debug_remove_all_breakpoints(
+        &self,
+        Parameters(p): Parameters<FlowDebugOidParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.flow_debug_remove_all_breakpoints(&p.debug_oid).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Set/modify pipeline values in a paused debug session.")]
+    async fn flow_debug_set_pipeline(
+        &self,
+        Parameters(p): Parameters<FlowDebugSetPipelineParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let pipe = match parse_json(&p.pipeline) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.flow_debug_set_pipeline(&p.debug_oid, &pipe).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Stop the currently running service in a debug session.")]
+    async fn flow_debug_stop_service(
+        &self,
+        Parameters(p): Parameters<FlowDebugOidParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.flow_debug_stop_service(&p.debug_oid).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────
 
     #[tool(

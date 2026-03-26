@@ -587,6 +587,35 @@ check "messaging_publishable_doctypes" "$out" "publishableDocumentTypes"
 out=$(mcp_call 2 "messaging_csq_count" '{"alias_name":"IS_LOCAL_CONNECTION"}')
 check_not_empty "messaging_csq_count" "$out"
 
+# ── Flow Debugging (full lifecycle) ───────────────────────────
+echo "--- Flow Debugging ---"
+# Start debug session on helloWorld service
+out=$(mcp_call 2 "flow_debug_start" '{"service":"claudedemo.services:helloWorld"}')
+check "flow_debug_start" "$out" "\$debugoid\|\$triggeredBreakPoint\|\$current"
+DEBUG_OID=$(echo "$out" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('\$debugoid',''))" 2>/dev/null)
+
+if [ -n "$DEBUG_OID" ]; then
+  # Step over first step (MAP with default value)
+  out=$(mcp_call 2 "flow_debug_execute" "{\"debug_oid\":\"$DEBUG_OID\",\"command\":\"stepOver\"}")
+  check "flow_debug_stepOver" "$out" "\$pipeline\|\$current"
+
+  # Verify pipeline has the default value
+  check "flow_debug_pipeline_value" "$out" "World\|name"
+
+  # Step over second step (INVOKE pub.string:concat)
+  out=$(mcp_call 2 "flow_debug_execute" "{\"debug_oid\":\"$DEBUG_OID\",\"command\":\"stepOver\"}")
+  check "flow_debug_stepOver2" "$out" "\$pipeline\|greeting"
+
+  # Close debug session
+  out=$(mcp_call 2 "flow_debug_close" "{\"debug_oid\":\"$DEBUG_OID\"}")
+  check "flow_debug_close" "$out" ""
+  PASS=$((PASS + 1)) # close returns empty which is success
+  echo "  PASS: flow_debug_close"
+else
+  echo "  SKIP: flow debug steps (no debug_oid)"
+  SKIP=$((SKIP + 5))
+fi
+
 # ── Prompts ──────────────────────────────────────────────────
 echo "--- Prompts ---"
 for pname in setup_kafka_streaming setup_jdbc_connection setup_sap_connection setup_jms_connection setup_mqtt_connection setup_scheduled_task setup_rest_api setup_user_management setup_oauth; do

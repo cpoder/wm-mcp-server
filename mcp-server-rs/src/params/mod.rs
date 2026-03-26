@@ -1,6 +1,7 @@
 pub mod adapters;
 pub mod auditing;
 pub mod common;
+pub mod flow_debug;
 pub mod global_vars;
 pub mod jdbc_pools;
 pub mod jms;
@@ -24,6 +25,7 @@ pub mod users;
 pub use adapters::*;
 pub use auditing::*;
 pub use common::*;
+pub use flow_debug::*;
 pub use global_vars::*;
 pub use jdbc_pools::*;
 pub use jms::*;
