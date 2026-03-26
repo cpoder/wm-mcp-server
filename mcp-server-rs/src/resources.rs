@@ -441,6 +441,59 @@ This pattern: call a service that returns a record array, loop over it, extract 
   ]}
 }
 ```
+
+## Example 4: Nested record mapping (adapter service output extraction)
+
+This pattern: call an adapter service, extract nested fields from the result into a flat output.
+Uses type 2 (Record) with nested paths -- NO LOOP needed for single-record access.
+
+```json
+{
+  "flow": {"type":"ROOT","version":"3.0","cleanup":"true","nodes":[
+    {"type":"INVOKE","service":"mypkg.adapters:getAccountDetails","validate-in":"$none","validate-out":"$none",
+     "nodes":[
+       {"type":"MAP","mode":"INPUT","nodes":[
+         {"type":"MAPCOPY","from":"/accountID;1;0","to":"/getAccountDetailsInput;2;0/EXTERNAL_ID_1;1;0"}
+       ]},
+       {"type":"MAP","mode":"OUTPUT","nodes":[
+         {"type":"MAPDELETE","field":"/getAccountDetailsInput;2;0"}
+       ]}
+     ]},
+    {"type":"MAP","mode":"STANDALONE","nodes":[
+      {"type":"MAPCOPY","from":"/getAccountDetailsOutput;2;0/results;2;1/AccountName;1;0","to":"/accountName;1;0"},
+      {"type":"MAPCOPY","from":"/getAccountDetailsOutput;2;0/results;2;1/AccountType;1;0","to":"/accountType;1;0"},
+      {"type":"MAPCOPY","from":"/getAccountDetailsOutput;2;0/results;2;1/WebSite;1;0","to":"/website;1;0"},
+      {"type":"MAPDELETE","field":"/getAccountDetailsOutput;2;0"}
+    ]}
+  ]}
+}
+```
+
+**Key patterns for nested record access:**
+- `from:"/parentRecord;2;0/childRecord;2;1/field;1;0"` -- chain type 2 (Record) paths
+- type 2 dim 0 = single record, dim 1 = record array
+- Can write to nested paths too: `to:"/inputRecord;2;0/field;1;0"` creates the structure
+- Use `MAPDELETE` to clean up temporary records from the pipeline
+- For adapter services: input goes to `/{serviceName}Input;2;0/field`, output comes from `/{serviceName}Output;2;0/results;2;1/field`
+
+## Example 5: String concatenation with pub.string:concat
+
+Build a search pattern by concatenating prefix + input + suffix.
+
+```json
+{"type":"INVOKE","service":"pub.string:concat","validate-in":"$none","validate-out":"$none","nodes":[
+  {"type":"MAP","mode":"INPUT","nodes":[
+    {"type":"MAPSET","field":"/inString1;1;0","overwrite":"true","d_enc":"XMLValues","mapseti18n":"true","data":"<Values version=\"2.0\"><value name=\"xml\">%</value></Values>"},
+    {"type":"MAPCOPY","from":"/searchTerm;1;0","to":"/inString2;1;0"}
+  ]},
+  {"type":"MAP","mode":"OUTPUT","nodes":[
+    {"type":"MAPCOPY","from":"/value;1;0","to":"/searchPattern;1;0"},
+    {"type":"MAPDELETE","field":"/inString1;1;0"},
+    {"type":"MAPDELETE","field":"/inString2;1;0"},
+    {"type":"MAPDELETE","field":"/value;1;0"}
+  ]}
+]}
+```
 "#;
 
 const ADAPTER_SERVICE_REF: &str = r#"# Adapter Service Configuration Reference
