@@ -708,6 +708,26 @@ check "loop_customers_extracted" "$out" "Alice.*Bob.*Carol\|customers"
 mcp_call 2 "node_delete" '{"name":"e2etest.loop:getCustomers"}' > /dev/null 2>&1
 mcp_call 2 "node_delete" '{"name":"e2etest.loop:searchAccounts"}' > /dev/null 2>&1
 
+# ── Tier 2: Proxy, JWT, Quiesce, Health ──────────────────────
+echo "--- HTTP Proxy ---"
+out=$(mcp_call 2 "proxy_list" '{}')
+check "proxy_list" "$out" "proxyAliases"
+
+echo "--- JWT ---"
+out=$(mcp_call 2 "jwt_issuer_list" '{}')
+check "jwt_issuer_list" "$out" "trustedIssuers"
+
+out=$(mcp_call 2 "jwt_settings_get" '{}')
+check_not_empty "jwt_settings_get" "$out"
+
+echo "--- Quiesce ---"
+out=$(mcp_call 2 "quiesce_status" '{}')
+check "quiesce_status" "$out" "ACTIVE\|isQuiesceMode"
+
+echo "--- Health Indicators ---"
+out=$(mcp_call 2 "health_indicators_list" '{}')
+check "health_indicators_list" "$out" "indicators\|Adapters"
+
 # ── Prompts ──────────────────────────────────────────────────
 echo "--- Prompts ---"
 for pname in setup_kafka_streaming setup_jdbc_connection setup_sap_connection setup_jms_connection setup_mqtt_connection setup_scheduled_task setup_rest_api setup_user_management setup_oauth; do

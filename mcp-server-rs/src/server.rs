@@ -3337,6 +3337,382 @@ impl WmServer {
         }
     }
 
+    // ── SFTP Client ─────────────────────────────────────────────────────
+
+    #[tool(description = "List all SFTP server aliases.")]
+    async fn sftp_server_list(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.sftp_server_list().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Create an SFTP server alias.\n\nRequired settings: alias (name), hostName, port (default 22)."
+    )]
+    async fn sftp_server_create(
+        &self,
+        Parameters(p): Parameters<SftpServerAliasCreateParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let s = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.sftp_server_create(&s).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Get details of an SFTP server alias.")]
+    async fn sftp_server_get(
+        &self,
+        Parameters(p): Parameters<SftpServerAliasNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.sftp_server_get(&p.alias).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Delete an SFTP server alias.")]
+    async fn sftp_server_delete(
+        &self,
+        Parameters(p): Parameters<SftpServerAliasNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.sftp_server_delete(&p.alias).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "List all SFTP user aliases.")]
+    async fn sftp_user_list(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.sftp_user_list().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Create an SFTP user alias.\n\nRequired settings: alias (name), userName, authenticationType (password/publicKey), password or privateKeyFileLocation, sftpServerAlias."
+    )]
+    async fn sftp_user_create(
+        &self,
+        Parameters(p): Parameters<SftpUserAliasCreateParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let s = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.sftp_user_create(&s).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Get details of an SFTP user alias.")]
+    async fn sftp_user_get(
+        &self,
+        Parameters(p): Parameters<SftpUserAliasNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.sftp_user_get(&p.alias).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Delete an SFTP user alias.")]
+    async fn sftp_user_delete(
+        &self,
+        Parameters(p): Parameters<SftpUserAliasNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.sftp_user_delete(&p.alias).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Test an SFTP connection using a user alias.")]
+    async fn sftp_test_connection(
+        &self,
+        Parameters(p): Parameters<SftpTestConnectionParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.sftp_test_connection(&p.alias).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    // ── HTTP Proxy ──────────────────────────────────────────────────────
+
+    #[tool(description = "List all HTTP proxy server aliases.")]
+    async fn proxy_list(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.proxy_list().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Create an HTTP proxy server alias.\n\nRequired settings: alias, host, port. Optional: user, password."
+    )]
+    async fn proxy_create(
+        &self,
+        Parameters(p): Parameters<ProxyCreateParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let s = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.proxy_create(&s).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Get details of an HTTP proxy server alias.")]
+    async fn proxy_get(
+        &self,
+        Parameters(p): Parameters<ProxyAliasNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.proxy_get(&p.alias).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Delete an HTTP proxy server alias.")]
+    async fn proxy_delete(
+        &self,
+        Parameters(p): Parameters<ProxyAliasNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.proxy_delete(&p.alias).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Enable an HTTP proxy server alias.")]
+    async fn proxy_enable(
+        &self,
+        Parameters(p): Parameters<ProxyAliasNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.proxy_enable(&p.alias).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Disable an HTTP proxy server alias.")]
+    async fn proxy_disable(
+        &self,
+        Parameters(p): Parameters<ProxyAliasNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.proxy_disable(&p.alias).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    // ── JWT Management ──────────────────────────────────────────────────
+
+    #[tool(description = "List all trusted JWT issuers.")]
+    async fn jwt_issuer_list(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.jwt_issuer_list().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Add a trusted JWT issuer.\n\nRequired settings: issuerName, jwksUri or certificate info."
+    )]
+    async fn jwt_issuer_add(
+        &self,
+        Parameters(p): Parameters<JwtIssuerCreateParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let s = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.jwt_issuer_add(&s).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Get details of a trusted JWT issuer.")]
+    async fn jwt_issuer_get(
+        &self,
+        Parameters(p): Parameters<JwtIssuerNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.jwt_issuer_get(&p.issuer_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Delete a trusted JWT issuer.")]
+    async fn jwt_issuer_delete(
+        &self,
+        Parameters(p): Parameters<JwtIssuerNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.jwt_issuer_delete(&p.issuer_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Get JWT global settings (skew tolerance, validation options).")]
+    async fn jwt_settings_get(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.jwt_settings_get().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Update JWT global settings.")]
+    async fn jwt_settings_update(
+        &self,
+        Parameters(p): Parameters<JwtSettingsUpdateParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let s = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.jwt_settings_update(&s).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    // ── Quiesce Mode ────────────────────────────────────────────────────
+
+    #[tool(description = "Get current quiesce mode status (ACTIVE or QUIESCE).")]
+    async fn quiesce_status(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.quiesce_status().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Enable quiesce mode (graceful drain -- stops accepting new requests while existing ones complete)."
+    )]
+    async fn quiesce_enable(
+        &self,
+        Parameters(p): Parameters<QuiesceSetParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let s = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.quiesce_enable(&s).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Disable quiesce mode (return to active -- start accepting new requests)."
+    )]
+    async fn quiesce_disable(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.quiesce_disable().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    // ── Health Indicators ───────────────────────────────────────────────
+
+    #[tool(
+        description = "List all health indicators with their enabled status (for K8s/container health checks)."
+    )]
+    async fn health_indicators_list(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.health_indicators_list().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Get details of a specific health indicator.")]
+    async fn health_indicator_get(
+        &self,
+        Parameters(p): Parameters<HealthIndicatorNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.health_indicator_get(&p.name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Enable or disable a health indicator.")]
+    async fn health_indicator_change(
+        &self,
+        Parameters(p): Parameters<HealthIndicatorUpdateParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let s = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.health_indicator_change(&p.name, &s).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────
 
     #[tool(
