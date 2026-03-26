@@ -1,6 +1,6 @@
 [package]
 name = "wm-mcp-server"
-version = "2.0.0"
+version = "2.1.0"
 edition = "2024"
 description = "MCP server for managing webMethods Integration Server via pure HTTP API"
 license = "MIT"
@@ -13,8 +13,10 @@ name = "wm-mcp-server"
 path = "src/main.rs"
 
 [dependencies]
-rmcp = { version = "1.2", features = ["server", "transport-io", "macros"] }
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "io-std"] }
+rmcp = { version = "1.2", features = ["server", "transport-io", "transport-streamable-http-server", "macros"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "io-std", "net", "signal"] }
+axum = "0.8"
+tokio-util = { version = "0.7", features = ["rt"] }
 reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
