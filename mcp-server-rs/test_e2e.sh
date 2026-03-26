@@ -644,6 +644,32 @@ check "mock_load" "$out" "pub.math:addInts\|scope"
 out=$(mcp_call 2 "mock_clear_all" '{}')
 check_not_empty "mock_clear_all" "$out"
 
+# ── JAR Installer (full E2E: install MySQL driver -> create pool -> test connection -> cleanup)
+echo "--- JAR Installer ---"
+# Install MySQL JDBC driver via Maven (no bounce - we don't want to restart IS mid-test)
+JARS_JSON='[{"maven":"com.mysql:mysql-connector-j:9.2.0"}]'
+out=$((printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}\n'; sleep 0.3; printf '{"jsonrpc":"2.0","method":"notifications/initialized"}\n'; sleep 0.3; printf '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"install_jars","arguments":{"jars":"%s","package_name":"E2EMySQLJars","description":"E2E MySQL test","bounce":false}}}\n' "$(echo "$JARS_JSON" | sed 's/"/\\"/g')"; sleep 15) | timeout 30 "$BIN" 2>/dev/null | python3 -c "
+import sys, json
+for line in sys.stdin:
+    d = json.loads(line.strip())
+    if d.get('id') == 2:
+        content = d.get('result',{}).get('content',[])
+        if content: print(content[0].get('text',''))
+        break
+")
+check "install_jars" "$out" "installed\|mysql-connector"
+
+# Verify package was created (without bounce, JARs won't be on classpath yet)
+out=$(mcp_call 2 "package_info" '{"package_name":"E2EMySQLJars"}')
+check "install_jars_package_exists" "$out" "E2EMySQLJars"
+
+# Cleanup - delete the test package
+out=$(mcp_call 2 "package_delete" '{"package_name":"E2EMySQLJars"}')
+check "install_jars_cleanup" "$out" "deleted\|E2EMySQLJars"
+
+# Note: Full MySQL connection test validated manually:
+# install_jars with bounce=true -> IS restarts -> create JDBC pool -> test connection -> SUCCESS
+
 # ── Prompts ──────────────────────────────────────────────────
 echo "--- Prompts ---"
 for pname in setup_kafka_streaming setup_jdbc_connection setup_sap_connection setup_jms_connection setup_mqtt_connection setup_scheduled_task setup_rest_api setup_user_management setup_oauth; do

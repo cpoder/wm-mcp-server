@@ -7,6 +7,7 @@ mod adapters;
 mod auditing;
 mod flow_debug;
 mod global_vars;
+mod jar_installer;
 mod jdbc_pools;
 mod jms;
 mod jndi;

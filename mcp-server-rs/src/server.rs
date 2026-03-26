@@ -3308,6 +3308,33 @@ impl WmServer {
         }
     }
 
+    // ── JAR Installer ───────────────────────────────────────────────────
+
+    #[tool(
+        description = "Download and install JARs into IS by creating a dedicated package.\n\nDownloads JARs from Maven Central or URLs, creates a package with the JARs in code/jars/static/, activates it, and optionally bounces IS.\n\nJAR sources: use 'maven' for Maven coordinates (e.g., 'com.mysql:mysql-connector-j:9.2.0') or 'url' for direct download.\n\nThis is the recommended way to add JDBC drivers, JMS client libraries, or any JARs that need to be on the IS classpath.\n\nIMPORTANT: IS must be restarted (bounce=true) for JARs to appear on the classpath."
+    )]
+    async fn install_jars(
+        &self,
+        Parameters(p): Parameters<InstallJarsParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let jars = match parse_json(&p.jars) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        let desc = p
+            .description
+            .as_deref()
+            .unwrap_or("JAR installer package created by MCP server");
+        match c
+            .install_jars(&jars, &p.package_name, desc, p.bounce.unwrap_or(true))
+            .await
+        {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────
 
     #[tool(
