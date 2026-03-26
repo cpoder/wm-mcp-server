@@ -19,6 +19,7 @@ pub mod scheduler;
 pub mod security;
 pub mod services;
 pub mod streaming;
+pub mod testing;
 pub mod triggers;
 pub mod users;
 
@@ -43,6 +44,7 @@ pub use scheduler::*;
 pub use security::*;
 pub use services::*;
 pub use streaming::*;
+pub use testing::*;
 pub use triggers::*;
 pub use users::*;
 

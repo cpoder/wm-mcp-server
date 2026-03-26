@@ -3171,6 +3171,143 @@ impl WmServer {
         }
     }
 
+    // ── Unit Testing ────────────────────────────────────────────────────
+
+    #[tool(
+        description = "Run test suites from specified packages.\n\nReturns an executionID for checking status and retrieving reports. Use test_suite_packages as a JSON array of package names (e.g., '[\"MyPackage\"]')."
+    )]
+    async fn test_run(
+        &self,
+        Parameters(p): Parameters<TestRunParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let packages = match parse_json(&p.test_suite_packages) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c
+            .test_run(
+                &packages,
+                p.test_user.as_deref(),
+                p.test_user_password.as_deref(),
+            )
+            .await
+        {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Check the status of a test execution (RUNNING, COMPLETED, FAILED).")]
+    async fn test_check_status(
+        &self,
+        Parameters(p): Parameters<TestExecutionIdParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.test_check_status(&p.execution_id).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Get a human-readable text report for a test execution.")]
+    async fn test_text_report(
+        &self,
+        Parameters(p): Parameters<TestExecutionIdParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.test_text_report(&p.execution_id).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Get a JUnit XML report for a test execution (for CI/CD integration).")]
+    async fn test_junit_report(
+        &self,
+        Parameters(p): Parameters<TestExecutionIdParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.test_junit_report(&p.execution_id).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Load a service mock.\n\nReplaces the real service with a mock for testing. Scope: 'session' (current session only) or 'global' (all sessions)."
+    )]
+    async fn mock_load(
+        &self,
+        Parameters(p): Parameters<MockLoadParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.mock_load(&p.scope, &p.service, &p.mock_object).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Clear a specific service mock.")]
+    async fn mock_clear(
+        &self,
+        Parameters(p): Parameters<MockClearParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.mock_clear(&p.scope, &p.service).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Clear all service mocks.")]
+    async fn mock_clear_all(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.mock_clear_all().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "List all currently active service mocks.")]
+    async fn mock_list(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.mock_list().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Suspend all service mocks (temporarily disable without removing).")]
+    async fn mock_suspend(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.mock_suspend().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Resume all suspended service mocks.")]
+    async fn mock_resume(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.mock_resume().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────
 
     #[tool(

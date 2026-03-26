@@ -616,6 +616,34 @@ else
   SKIP=$((SKIP + 5))
 fi
 
+# ── Unit Testing (full lifecycle) ─────────────────────────────
+echo "--- Unit Testing ---"
+# Test run via curl (needs more time than mcp_call's 1s timeout)
+EXEC_RESULT=$(curl -s -u Administrator:manage -H "Accept: application/json" \
+  -X POST 'http://localhost:5555/invoke/wm.task.executor:run' \
+  -H "Content-Type: application/json" \
+  -d '{"testSuitePackages":["E2ETestPkg"],"testuser":"Administrator","testuserpassword":"manage"}' 2>&1)
+EXEC_ID=$(echo "$EXEC_RESULT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('executionID',''))" 2>/dev/null)
+if [ -n "$EXEC_ID" ]; then
+  echo "  PASS: test_run (executionID=$EXEC_ID)"
+  PASS=$((PASS + 1))
+  out=$(mcp_call 2 "test_check_status" "{\"execution_id\":\"$EXEC_ID\"}")
+  check "test_check_status" "$out" "COMPLETED\|status"
+else
+  echo "  FAIL: test_run (no executionID)"
+  FAIL=$((FAIL + 1))
+fi
+
+# Mock lifecycle: load -> list -> clear
+out=$(mcp_call 2 "mock_list" '{}')
+check "mock_list" "$out" "mockedServices"
+
+out=$(mcp_call 2 "mock_load" '{"scope":"session","service":"pub.math:addInts","mock_object":"pub.flow:debugLog"}')
+check "mock_load" "$out" "pub.math:addInts\|scope"
+
+out=$(mcp_call 2 "mock_clear_all" '{}')
+check_not_empty "mock_clear_all" "$out"
+
 # ── Prompts ──────────────────────────────────────────────────
 echo "--- Prompts ---"
 for pname in setup_kafka_streaming setup_jdbc_connection setup_sap_connection setup_jms_connection setup_mqtt_connection setup_scheduled_task setup_rest_api setup_user_management setup_oauth; do
