@@ -27,7 +27,7 @@ impl super::ISClient {
     pub async fn openapi_doc_get(&self, rad_name: &str) -> Result<Value, String> {
         self.invoke_post(
             "wm.server.openapi:getOpenAPIDoc",
-            &json!({"radName": rad_name}),
+            &json!({"radName": rad_name, "openapi.json": "true"}),
         )
         .await
     }

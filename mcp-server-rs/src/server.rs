@@ -2358,7 +2358,9 @@ impl WmServer {
         }
     }
 
-    #[tool(description = "Get the OpenAPI document (JSON/YAML) for a REST API descriptor.")]
+    #[tool(
+        description = "Get the OpenAPI document for a REST API descriptor.\n\nReturns the full OpenAPI 3.0 spec in JSON format."
+    )]
     async fn openapi_doc_get(
         &self,
         Parameters(p): Parameters<OpenApiDocParam>,
@@ -2371,7 +2373,7 @@ impl WmServer {
     }
 
     #[tool(
-        description = "Generate IS provider services from an OpenAPI specification.\n\nRequired settings: packageName, folderName, radName (output descriptor name).\nProvide either sourceUri (URL) or openapiContent (inline spec).\nOptional: isGroupByTag (true/false)."
+        description = "Generate IS provider services from an OpenAPI specification.\n\nRequired settings: packageName, folderName (must exist -- use folder_create first), radName (descriptor name).\nRequired: sourceUri and openapiUrl (set both to 'inline' when providing openapiContent).\n\nRECOMMENDED APPROACH: Pass the spec content directly in openapiContent (JSON or YAML string). Set sourceUri and openapiUrl to 'inline'. IS may not be able to fetch remote URLs.\n\nTo use a remote spec: download it yourself first, then pass the content in openapiContent.\n\nOptional: isGroupByTag (default true).\n\nCreates a REST API descriptor + auto-generated service stubs and resource definitions."
     )]
     async fn openapi_generate_provider(
         &self,

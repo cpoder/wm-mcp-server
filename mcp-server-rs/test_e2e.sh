@@ -457,8 +457,17 @@ check "ws_consumer_endpoint_list" "$out" "endpoints"
 out=$(mcp_call 2 "rest_resource_list" '{}')
 check "rest_resource_list" "$out" "restV2Resources"
 
-# OpenAPI generation tested manually (requires network access from IS).
-# The list/get tools are verified above.
+# Full OpenAPI generation E2E: create folder -> generate from inline spec -> get doc -> cleanup
+mcp_call 2 "folder_create" '{"package":"E2ETestPkg","folder_path":"e2etest.restapi"}' > /dev/null 2>&1
+OASETTINGS='{"folderName":"e2etest.restapi","packageName":"E2ETestPkg","radName":"e2eApi","sourceUri":"inline","openapiUrl":"inline","openapiContent":"{\"openapi\":\"3.0.0\",\"info\":{\"title\":\"Test\",\"version\":\"1.0\"},\"paths\":{\"/test\":{\"get\":{\"operationId\":\"getTest\",\"responses\":{\"200\":{\"description\":\"OK\"}}}}}}"}'
+out=$(mcp_call 2 "openapi_generate_provider" "{\"settings\":$(echo "$OASETTINGS" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read().strip()))')}")
+check "openapi_generate_provider" "$out" "e2eApi\|radName\|folderName"
+
+out=$(mcp_call 2 "openapi_doc_get" '{"rad_name":"e2etest.restapi:e2eApi"}')
+check "openapi_doc_get" "$out" "openapi\|3.0\|paths"
+
+# Cleanup
+mcp_call 2 "node_delete" '{"name":"e2etest.restapi:e2eApi"}' > /dev/null 2>&1
 
 # ── Security & Keystore ───────────────────────────────────────
 echo "--- Security ---"
