@@ -728,6 +728,26 @@ echo "--- Health Indicators ---"
 out=$(mcp_call 2 "health_indicators_list" '{}')
 check "health_indicators_list" "$out" "indicators\|Adapters"
 
+# ── Tier 2 continued: EGW, IP Access, Password, Alerts ───────
+echo "--- Enterprise Gateway ---"
+out=$(mcp_call 2 "egw_rules_list" '{}')
+check "egw_rules_list" "$out" "denyRuleList\|alertRuleList\|dosRuleList"
+
+out=$(mcp_call 2 "egw_denied_ip_list" '{}')
+check_not_empty "egw_denied_ip_list" "$out"
+
+echo "--- IP Access ---"
+out=$(mcp_call 2 "ip_access_list" '{}')
+check "ip_access_list" "$out" "type\|deny"
+
+echo "--- Password Policy ---"
+out=$(mcp_call 2 "password_policy_get" '{}')
+check "password_policy_get" "$out" "isEnabled\|expirationInterval"
+
+echo "--- Alerts ---"
+out=$(mcp_call 2 "alert_status" '{}')
+check "alert_status" "$out" "enabled\|message"
+
 # ── Prompts ──────────────────────────────────────────────────
 echo "--- Prompts ---"
 for pname in setup_kafka_streaming setup_jdbc_connection setup_sap_connection setup_jms_connection setup_mqtt_connection setup_scheduled_task setup_rest_api setup_user_management setup_oauth; do

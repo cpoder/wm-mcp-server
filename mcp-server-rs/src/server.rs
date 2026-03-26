@@ -3713,6 +3713,205 @@ impl WmServer {
         }
     }
 
+    // ── Enterprise Gateway ──────────────────────────────────────────────
+
+    #[tool(description = "List all Enterprise Gateway rules (deny, alert, DoS).")]
+    async fn egw_rules_list(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.egw_rules_list().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Get Enterprise Gateway DoS protection settings.")]
+    async fn egw_dos_get(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.egw_dos_get().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Update Enterprise Gateway DoS protection settings.")]
+    async fn egw_dos_update(
+        &self,
+        Parameters(p): Parameters<EgwDosUpdateParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let s = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.egw_dos_update(&s).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "List IP addresses denied by Enterprise Gateway.")]
+    async fn egw_denied_ip_list(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.egw_denied_ip_list().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    // ── IP Access Control ───────────────────────────────────────────────
+
+    #[tool(description = "List IP access rules (global allow/deny list).")]
+    async fn ip_access_list(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.ip_access_list().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Add an IP access rule.\n\nSettings: ip (IP address or CIDR), type (allow/deny)."
+    )]
+    async fn ip_access_add(
+        &self,
+        Parameters(p): Parameters<IpRuleAddParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let s = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.ip_access_add(&s).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Delete an IP access rule.")]
+    async fn ip_access_delete(
+        &self,
+        Parameters(p): Parameters<IpRuleParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.ip_access_delete(&p.ip).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    // ── Password Policy ─────────────────────────────────────────────────
+
+    #[tool(description = "Get password expiry policy settings.")]
+    async fn password_policy_get(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.password_policy_get().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Update password expiry policy settings.\n\nSettings: isEnabled, expirationInterval (days), expiryEmailBefore (days), emailIds."
+    )]
+    async fn password_policy_update(
+        &self,
+        Parameters(p): Parameters<PasswordPolicyUpdateParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let s = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.password_policy_update(&s).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    // ── Alerts ──────────────────────────────────────────────────────────
+
+    #[tool(description = "Get alerting status (enabled/disabled).")]
+    async fn alert_status(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.alert_status().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Enable alert notifiers.")]
+    async fn alert_enable(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.alert_enable().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Disable all alert notifiers.")]
+    async fn alert_disable(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.alert_disable().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    // ── WebSocket Server ────────────────────────────────────────────────
+
+    #[tool(description = "List WebSocket sessions by port.")]
+    async fn websocket_sessions_by_port(
+        &self,
+        Parameters(p): Parameters<WebSocketEndpointCreateParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let s = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        let port = s.get("port").and_then(|v| v.as_str()).unwrap_or("");
+        match c.websocket_sessions_by_port(port).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Close a specific WebSocket session.")]
+    async fn websocket_close_session(
+        &self,
+        Parameters(p): Parameters<WebSocketSessionParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.websocket_close_session(&p.session_id).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────
 
     #[tool(

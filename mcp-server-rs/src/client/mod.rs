@@ -4,10 +4,13 @@
 //! All operations use the IS HTTP API - no disk access required.
 
 mod adapters;
+mod alerts;
 mod auditing;
+mod enterprise_gw;
 mod flow_debug;
 mod global_vars;
 mod health;
+mod ip_access;
 mod jar_installer;
 mod jdbc_pools;
 mod jms;
@@ -20,6 +23,7 @@ mod namespace;
 mod oauth;
 mod packages;
 mod packages_ext;
+mod password_policy;
 mod ports;
 mod proxy;
 mod quiesce;
@@ -33,6 +37,7 @@ mod testing;
 mod triggers;
 mod users;
 mod webservices;
+mod websocket;
 
 use reqwest::Client;
 use reqwest::header::{ACCEPT, AUTHORIZATION, HeaderMap, HeaderValue};
