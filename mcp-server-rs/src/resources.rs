@@ -191,12 +191,115 @@ Group steps with a label and exit condition.
 {"type": "SEQUENCE", "label": "myLabel", "exit-on": "FAILURE", "nodes": [/* steps */]}
 ```
 
+Exit-on values: `FAILURE` (stop on first failure, default), `SUCCESS` (stop on first success), `DONE` (run all regardless).
+
+### TRY/CATCH (CRITICAL for production services)
+
+TRY/CATCH is implemented using SEQUENCE elements with a `form` attribute. The TRY and CATCH are **sibling** elements (NOT nested).
+
+```json
+{
+  "type": "SEQUENCE", "exit-on": "FAILURE", "form": "TRY",
+  "nodes": [
+    {"type": "SEQUENCE", "exit-on": "FAILURE", "comment": "business logic",
+     "nodes": [
+       {"type": "INVOKE", "service": "my.svc:doWork"},
+       {"type": "BRANCH", "switch": "/statusCode", "nodes": [
+         {"type": "SEQUENCE", "label": "200", "exit-on": "FAILURE", "nodes": []},
+         {"type": "SEQUENCE", "label": "$default", "exit-on": "FAILURE", "nodes": [
+           {"type": "MAP", "mode": "STANDALONE", "nodes": [
+             {"type": "MAPSET", "field": "/error/status;1;0", "overwrite": "true",
+              "d_enc": "XMLValues", "mapseti18n": "true",
+              "data": "<Values version=\"2.0\"><value name=\"xml\">500</value></Values>"}
+           ]},
+           {"type": "EXIT", "from": "$parent", "signal": "FAILURE", "failure-message": "Operation failed"}
+         ]}
+       ]}
+     ]
+    }
+  ]
+},
+{
+  "type": "SEQUENCE", "exit-on": "FAILURE", "form": "CATCH",
+  "nodes": [
+    {"type": "BRANCH", "switch": "/error/status", "nodes": [
+      {"type": "SEQUENCE", "label": "$null", "exit-on": "FAILURE", "nodes": [
+        {"type": "MAP", "mode": "STANDALONE", "nodes": [
+          {"type": "MAPSET", "field": "/error/status;1;0", "overwrite": "true",
+           "d_enc": "XMLValues", "mapseti18n": "true",
+           "data": "<Values version=\"2.0\"><value name=\"xml\">500</value></Values>"},
+          {"type": "MAPSET", "field": "/error/message;1;0", "overwrite": "true",
+           "d_enc": "XMLValues", "mapseti18n": "true",
+           "data": "<Values version=\"2.0\"><value name=\"xml\">Internal error</value></Values>"}
+        ]},
+        {"type": "INVOKE", "service": "pub.flow:getLastFailureCaught"},
+        {"type": "INVOKE", "service": "pub.flow:debugLog"}
+      ]}
+    ]},
+    {"type": "INVOKE", "service": "pub.flow:setHTTPResponse"}
+  ]
+}
+```
+
+**Rules:**
+1. `form` attribute: `"TRY"` on the try wrapper, `"CATCH"` on the catch handler
+2. Both MUST have `exit-on: "FAILURE"`
+3. TRY and CATCH are **adjacent siblings** at the same level (both children of FLOW root or same parent)
+4. Inside TRY: use `EXIT from="$parent" signal="FAILURE"` to trigger the catch
+5. Inside CATCH: call `pub.flow:getLastFailureCaught` to get failure details (returns `failureMessage`, `failureName`, `failure`)
+6. For transactions: call `pub.art.transaction:rollbackTransaction` in CATCH block
+
 ### EXIT
 Exit from the current flow, loop, or sequence.
 ```json
-{"type": "EXIT", "from": "$flow", "signal": "FAILURE"}
+{"type": "EXIT", "from": "$flow", "signal": "FAILURE", "failure-message": "Error message"}
 ```
-`from` values: `$flow`, `$loop`, `$parent` (exit sequence)
+
+`from` values:
+- `$flow` -- exit the entire flow service
+- `$parent` -- exit the parent SEQUENCE (used to trigger CATCH in TRY/CATCH)
+- `$loop` -- exit the nearest LOOP
+- `$iteration` -- exit the current LOOP iteration only
+
+`signal` values: `FAILURE` (triggers catch/error), `SUCCESS` (clean exit)
+
+EXIT can be a direct child of BRANCH for value-matching:
+```json
+{"type": "EXIT", "label": "ERR_01", "from": "$flow", "signal": "FAILURE", "failure-message": "API Key invalid"}
+```
+
+### MAPINVOKE (inline service call within MAP)
+Call a service inline during a MAP step (e.g., generate UUID, get current date):
+```json
+{
+  "type": "MAP", "mode": "STANDALONE", "nodes": [
+    {
+      "type": "MAPINVOKE", "service": "pub.utils:generateUUID",
+      "validate-in": "$none", "validate-out": "$none", "invoke-order": "0",
+      "nodes": [
+        {"type": "MAP", "mode": "INVOKEINPUT", "nodes": []},
+        {"type": "MAP", "mode": "INVOKEOUTPUT", "nodes": [
+          {"type": "MAPCOPY", "from": "/UUID;1;0", "to": "/contextId;1;0"}
+        ]}
+      ]
+    }
+  ]
+}
+```
+
+### MAPSET with Variable Substitution
+Pipeline variables use `%variableName%`, global variables also use `%GLOBAL_VAR%`:
+```json
+{
+  "type": "MAPSET", "field": "/url;1;0", "overwrite": "true",
+  "variables": "true", "globalvariables": "true",
+  "d_enc": "XMLValues", "mapseti18n": "true",
+  "data": "<Values version=\"2.0\"><value name=\"xml\">%SERVER_URL%/api/%resourceId%</value></Values>"
+}
+```
+
+- `"variables": "true"` -- enables pipeline variable substitution (`%pipelineVar%`)
+- `"globalvariables": "true"` -- enables IS global variable substitution (`%GLOBAL_VAR%`)
 
 ## Service Signature (svc_sig)
 
@@ -621,6 +724,244 @@ Call external REST API, branch on response code, map success/error responses.
 - HTTP response: `/httpResponse;2;0/responseCode;1;0` etc via MAPSET
 - REST connector: `wm.server.openapi:invoke` with path/method/radNamespace + BRANCH on status code
 - RecordRef copy: `/source;4;0;pkg:DocType` TO `/target;4;0;pkg:DocType` preserves type
+
+## Example 11: TRY/CATCH with error handling (production API pattern)
+
+REST API service with TRY/CATCH, BRANCH on status, EXIT on failure, error logging in CATCH.
+Based on obsCustomerManagement:getCustomers pattern.
+
+```json
+{
+  "node_nsName": "mypkg.services:getResource",
+  "node_pkg": "MyPackage",
+  "node_type": "service",
+  "svc_type": "flow",
+  "svc_subtype": "default",
+  "svc_sigtype": "java 3.5",
+  "stateless": "yes",
+  "pipeline_option": 1,
+  "svc_sig": {
+    "sig_in": {
+      "node_type": "record", "field_type": "record", "field_dim": "0", "nillable": "true",
+      "javaclass": "com.wm.util.Values",
+      "rec_fields": [
+        {"node_type": "field", "field_name": "resourceId", "field_type": "string", "field_dim": "0", "nillable": "true"}
+      ]
+    },
+    "sig_out": {
+      "node_type": "record", "field_type": "record", "field_dim": "0", "nillable": "true",
+      "javaclass": "com.wm.util.Values",
+      "rec_fields": [
+        {"node_type": "field", "field_name": "result", "field_type": "string", "field_dim": "0", "nillable": "true"}
+      ]
+    }
+  },
+  "flow": {
+    "type": "ROOT", "version": "3.0", "cleanup": "true",
+    "nodes": [
+      {
+        "type": "SEQUENCE", "exit-on": "FAILURE", "form": "TRY",
+        "nodes": [
+          {
+            "type": "SEQUENCE", "exit-on": "FAILURE", "comment": "validate input",
+            "nodes": [
+              {"type": "BRANCH", "switch": "/resourceId", "nodes": [
+                {"type": "SEQUENCE", "label": "$null", "exit-on": "FAILURE", "nodes": [
+                  {"type": "MAP", "mode": "STANDALONE", "nodes": [
+                    {"type": "MAPSET", "field": "/error/status;1;0", "overwrite": "true",
+                     "d_enc": "XMLValues", "mapseti18n": "true",
+                     "data": "<Values version=\"2.0\"><value name=\"xml\">400</value></Values>"},
+                    {"type": "MAPSET", "field": "/error/message;1;0", "overwrite": "true",
+                     "d_enc": "XMLValues", "mapseti18n": "true",
+                     "data": "<Values version=\"2.0\"><value name=\"xml\">resourceId is required</value></Values>"}
+                  ]},
+                  {"type": "EXIT", "from": "$parent", "signal": "FAILURE", "failure-message": "resourceId is required"}
+                ]},
+                {"type": "SEQUENCE", "label": "$default", "exit-on": "FAILURE", "nodes": []}
+              ]}
+            ]
+          },
+          {
+            "type": "SEQUENCE", "exit-on": "FAILURE", "comment": "call backend service",
+            "nodes": [
+              {"type": "INVOKE", "service": "mypkg.impl:fetchResource", "validate-in": "$none", "validate-out": "$none"},
+              {"type": "MAP", "mode": "STANDALONE", "nodes": [
+                {"type": "MAPCOPY", "from": "/fetchOutput/data;1;0", "to": "/result;1;0"}
+              ]}
+            ]
+          },
+          {
+            "type": "SEQUENCE", "exit-on": "FAILURE", "comment": "set success response",
+            "nodes": [
+              {"type": "INVOKE", "service": "pub.flow:setHTTPResponse", "validate-in": "$none", "validate-out": "$none",
+               "nodes": [
+                 {"type": "MAP", "mode": "INPUT", "nodes": [
+                   {"type": "MAPSET", "field": "/responseCode;1;0", "overwrite": "true",
+                    "d_enc": "XMLValues", "mapseti18n": "true",
+                    "data": "<Values version=\"2.0\"><value name=\"xml\">200</value></Values>"}
+                 ]}
+               ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "SEQUENCE", "exit-on": "FAILURE", "form": "CATCH",
+        "nodes": [
+          {"type": "BRANCH", "switch": "/error/status", "nodes": [
+            {"type": "SEQUENCE", "label": "$null", "exit-on": "FAILURE", "comment": "unhandled error",
+             "nodes": [
+              {"type": "MAP", "mode": "STANDALONE", "nodes": [
+                {"type": "MAPSET", "field": "/error/status;1;0", "overwrite": "true",
+                 "d_enc": "XMLValues", "mapseti18n": "true",
+                 "data": "<Values version=\"2.0\"><value name=\"xml\">500</value></Values>"},
+                {"type": "MAPSET", "field": "/error/message;1;0", "overwrite": "true",
+                 "d_enc": "XMLValues", "mapseti18n": "true",
+                 "data": "<Values version=\"2.0\"><value name=\"xml\">Internal error</value></Values>"}
+              ]},
+              {"type": "INVOKE", "service": "pub.flow:getLastFailureCaught", "validate-in": "$none", "validate-out": "$none"},
+              {"type": "INVOKE", "service": "pub.flow:debugLog", "validate-in": "$none", "validate-out": "$none",
+               "nodes": [
+                 {"type": "MAP", "mode": "INPUT", "nodes": [
+                   {"type": "MAPCOPY", "from": "/failureMessage;1;0", "to": "/message;1;0"},
+                   {"type": "MAPSET", "field": "/function;1;0", "overwrite": "true",
+                    "d_enc": "XMLValues", "mapseti18n": "true",
+                    "data": "<Values version=\"2.0\"><value name=\"xml\">mypkg.services:getResource</value></Values>"},
+                   {"type": "MAPSET", "field": "/level;1;0", "overwrite": "true",
+                    "d_enc": "XMLValues", "mapseti18n": "true",
+                    "data": "<Values version=\"2.0\"><value name=\"xml\">Error</value></Values>"}
+                 ]}
+               ]
+              }
+            ]}
+          ]},
+          {"type": "INVOKE", "service": "pub.flow:setHTTPResponse", "validate-in": "$none", "validate-out": "$none",
+           "nodes": [
+             {"type": "MAP", "mode": "INPUT", "nodes": [
+               {"type": "MAPCOPY", "from": "/error/status;1;0", "to": "/responseCode;1;0"},
+               {"type": "MAPCOPY", "from": "/error/message;1;0", "to": "/reasonPhrase;1;0"}
+             ]}
+           ]
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+**TRY/CATCH key points (from obsCustomerManagement, srvCustomerManagement):**
+- `form: "TRY"` and `form: "CATCH"` are SIBLINGS, not nested
+- Both always have `exit-on: "FAILURE"`
+- In TRY: set `/error/status` and `/error/message` BEFORE the EXIT step so CATCH knows the error type
+- EXIT with `from: "$parent"` and `signal: "FAILURE"` triggers the CATCH
+- In CATCH: check `/error/status` -- if `$null`, it's an unhandled error (call `pub.flow:getLastFailureCaught`)
+- `pub.flow:getLastFailureCaught` returns: `failureMessage`, `failureName`, `failure` (exception object)
+- `pub.flow:debugLog` inputs: `message`, `function` (service name), `level` (Error/Warn/Info/Debug)
+- For transactions: start before TRY, `pub.art.transaction:rollbackTransaction` in CATCH, commit at end of TRY
+
+## Example 12: TRY/CATCH with transaction and compensation (createCustomer pattern)
+
+Flow structure for transactional service with external API calls and DB operations:
+
+```
+FLOW root:
+  SEQUENCE (init): startTransaction
+  SEQUENCE form="TRY":
+    SEQUENCE: call external API -> BRANCH on status -> EXIT on failure
+    SEQUENCE: JDBC insert (within transaction)
+    SEQUENCE: call second API -> BRANCH on status -> EXIT on failure
+    SEQUENCE: commitTransaction + set 201 response
+  SEQUENCE form="CATCH":
+    BRANCH on /customerId:
+      $null: skip rollback (insert never happened)
+      $default: rollbackTransaction
+    BRANCH on /Organization/id:
+      $null: skip (API create never happened)
+      $default: call deleteOrganization (compensating action)
+    BRANCH on /error/status:
+      $null: set 500, getLastFailureCaught, debugLog
+    setHTTPResponse from /error/status
+    BRANCH on /error/status:
+      500: throwExceptionForRetry (for trigger retry)
+```
+
+**Key insight:** Check what was already created/modified before deciding what to roll back. Use pipeline variables set during the TRY block as flags.
+
+## Example 13: MAPINVOKE (inline service call in MAP)
+
+Generate a UUID and timestamp inside a MAP step:
+
+```json
+{"type": "MAP", "mode": "STANDALONE", "nodes": [
+  {"type": "MAPINVOKE", "service": "pub.utils:generateUUID",
+   "validate-in": "$none", "validate-out": "$none", "invoke-order": "0",
+   "nodes": [
+     {"type": "MAP", "mode": "INVOKEINPUT", "nodes": []},
+     {"type": "MAP", "mode": "INVOKEOUTPUT", "nodes": [
+       {"type": "MAPCOPY", "from": "/UUID;1;0", "to": "/correlationId;1;0"}
+     ]}
+   ]
+  },
+  {"type": "MAPINVOKE", "service": "pub.date:getCurrentDateString",
+   "validate-in": "$none", "validate-out": "$none", "invoke-order": "1",
+   "nodes": [
+     {"type": "MAP", "mode": "INVOKEINPUT", "nodes": [
+       {"type": "MAPSET", "field": "/pattern;1;0", "overwrite": "true",
+        "d_enc": "XMLValues", "mapseti18n": "true",
+        "data": "<Values version=\"2.0\"><value name=\"xml\">yyyy-MM-dd'T'HH:mm:ss.SSSZ</value></Values>"}
+     ]},
+     {"type": "MAP", "mode": "INVOKEOUTPUT", "nodes": [
+       {"type": "MAPCOPY", "from": "/value;1;0", "to": "/timestamp;1;0"}
+     ]}
+   ]
+  }
+]}
+```
+
+**MAPINVOKE rules:**
+- Inside MAP mode=STANDALONE, INVOKEINPUT, or INVOKEOUTPUT
+- Child MAPs use mode `INVOKEINPUT` and `INVOKEOUTPUT` (not INPUT/OUTPUT)
+- `invoke-order` controls execution order when multiple MAPINVOKEs exist
+- Common uses: `pub.utils:generateUUID`, `pub.date:getCurrentDate`, `pub.date:getCurrentDateString`, `pub.string:concat`, `pub.list:appendToDocumentList`
+
+## Example 14: MAPSET with global/pipeline variable substitution
+
+```json
+{"type": "MAP", "mode": "STANDALONE", "nodes": [
+  {"type": "MAPSET", "field": "/apiUrl;1;0", "overwrite": "true",
+   "variables": "true", "globalvariables": "true",
+   "d_enc": "XMLValues", "mapseti18n": "true",
+   "data": "<Values version=\"2.0\"><value name=\"xml\">%API_BASE_URL%/customers/%customerId%</value></Values>"},
+  {"type": "MAPSET", "field": "/password;1;0", "overwrite": "true",
+   "variables": "false", "globalvariables": "true",
+   "d_enc": "XMLValues", "mapseti18n": "true",
+   "data": "<Values version=\"2.0\"><value name=\"xml\">%SERVICE_PASSWORD%</value></Values>"}
+]}
+```
+
+- `variables: "true"` -> `%customerId%` is replaced with pipeline variable value
+- `globalvariables: "true"` -> `%API_BASE_URL%` and `%SERVICE_PASSWORD%` are replaced with IS global variable values
+- Common pattern: global vars for server URLs and passwords, pipeline vars for dynamic values
+
+## Example 15: pub.flow:clearPipeline (preserve specific variables)
+
+Clean pipeline keeping only specified variables:
+```json
+{"type": "INVOKE", "service": "pub.flow:clearPipeline", "validate-in": "$none", "validate-out": "$none",
+ "nodes": [
+   {"type": "MAP", "mode": "INPUT", "nodes": [
+     {"type": "MAPSET", "field": "/preserve;1;1", "overwrite": "true",
+      "d_enc": "XMLValues", "mapseti18n": "true",
+      "data": "<Values version=\"2.0\"><array name=\"xml\" type=\"value\" depth=\"1\"><value>responseCode</value><value>responseBody</value><value>error</value></array></Values>"}
+   ]}
+ ]
+}
+```
+
+- `preserve` is a String array (field type `1;1`) listing variable names to keep
+- Everything else is removed from the pipeline
 "#;
 
 const ADAPTER_SERVICE_REF: &str = r#"# Adapter Service Configuration Reference
@@ -1356,9 +1697,10 @@ Gets info about last trapped exception in a flow. Must be first step in catch bl
 - **Constraints:** Only callable from flow services. Map lastError to pipeline variable immediately if needed by subsequent steps. Does NOT capture EXIT step failures.
 
 ### pub.flow:getLastFailureCaught
-Returns failure details from CATCH steps.
+Returns failure details from a CATCH block (FORM="CATCH" SEQUENCE). Use INSTEAD of getLastError inside TRY/CATCH.
 - **In:** (none)
-- **Out:** failure details document
+- **Out:** `failureMessage` (String - the EXIT failure-message or exception message), `failureName` (String - exception class name), `failure` (Object - the Java Exception instance, can be passed to EXIT failure-instance)
+- **Constraints:** Only callable from within a FORM="CATCH" SEQUENCE. Returns null values if called outside CATCH.
 
 ### pub.flow:clearPipeline
 Removes all fields from the pipeline.
@@ -1449,10 +1791,53 @@ Writes pipeline field names and values to server log.
 - **In:** (none)
 - **Out:** (none) - output goes to server log
 
+### pub.flow:setHTTPResponse
+Sets HTTP response code and optional headers/body for REST services. Preferred over setResponseCode for REST APIs.
+- **In:** `responseCode` (String, req - e.g. "200", "400", "500"), `reasonPhrase` (String, opt - HTTP reason phrase), `contentType` (String, opt - e.g. "application/json"), `responseBody` (String or InputStream, opt)
+- **Out:** (none)
+- **Note:** Must be called before the flow returns. Common pattern: call in both TRY success path and CATCH error path.
+
 ### pub.flow:iterator
 Returns IData arrays in batches.
 - **In:** batch size and array input
 - **Out:** batched array segments
+
+---
+
+## pub.art.transaction (Adapter Transaction Management)
+
+### pub.art.transaction:startTransaction
+Starts a managed adapter transaction.
+- **In:** `transactionName` (String, req - unique name, commonly a UUID from pub.utils:generateUUID)
+- **Out:** (none)
+- **Note:** Start BEFORE a TRY block. All adapter operations (JDBC, SAP, etc.) within the same transaction name are atomic.
+
+### pub.art.transaction:commitTransaction
+Commits a managed adapter transaction.
+- **In:** `transactionName` (String, req - must match the startTransaction name)
+- **Out:** (none)
+- **Note:** Call at the end of the TRY block, after all DB/adapter operations succeed.
+
+### pub.art.transaction:rollbackTransaction
+Rolls back a managed adapter transaction.
+- **In:** `transactionName` (String, req - must match the startTransaction name)
+- **Out:** (none)
+- **Note:** Call in the CATCH block. Check pipeline variables to confirm the transaction was started before rolling back.
+
+---
+
+## pub.json (JSON Processing)
+
+### pub.json:documentToJSON
+Converts an IData document to a JSON string.
+- **In:** `document` (Document, req), `jsonStream` (opt - if true, returns OutputStream)
+- **Out:** `jsonString` (String - the JSON representation)
+- **Note:** Commonly used in CATCH blocks to serialize error documents for API responses.
+
+### pub.json:jsonStringToDocument
+Parses a JSON string into an IData document.
+- **In:** `jsonString` (String, req)
+- **Out:** `document` (Document - the parsed IData)
 
 ---
 
