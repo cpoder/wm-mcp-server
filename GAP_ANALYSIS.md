@@ -167,10 +167,10 @@ This could potentially accelerate implementing Tier 2 and Tier 3 significantly.
 
 ## TOTAL GAP
 
-| Tier | Areas | Tools Needed |
+| Tier | Status | Tools |
 |---|---|---|
-| Current | 25 areas | 167 tools |
-| **Tier 1** | 10 areas | ~95 tools |
-| **Tier 2** | 18 areas | ~95 tools |
-| **Tier 3** | 23 areas | ~70 tools |
-| **Full parity** | 76 areas | **~427 tools** |
+| **Current (v2.6.0)** | DONE | 336 tools |
+| **Tier 1** | ~95% complete | Remaining: flat file advanced ops |
+| **Tier 2** | ~90% complete | Remaining: event subscribers, alert channels |
+| **Tier 3** | 23 areas | ~70 tools (CSRF, VCS, Replication, Deployer, etc.) |
+| **Full parity** | | **~406+ tools** |

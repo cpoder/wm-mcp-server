@@ -13,31 +13,49 @@ Compatible with any MCP client: [IBM Bob](https://www.ibm.com/products/bob), [Cl
 
 | Area | What the AI can do | Tools |
 |---|---|---|
-| **Flow services** | Create services with full logic (INVOKE, MAP, BRANCH, LOOP), signatures, test them | 5 |
+| **Flow services** | Create services with full logic (INVOKE, MAP, BRANCH, LOOP, TRY/CATCH), signatures, test them | 5 |
 | **Flow debugging** | Step-by-step execution, inspect pipeline at each step, set breakpoints, modify variables | 7 |
 | **Unit testing** | Run test suites, get JUnit/text reports, mock services for isolated testing | 10 |
+| **Namespace dependencies** | Find dependents, references, unresolved refs, search nodes, refactor/rename | 6 |
 | **Adapter services** | Browse database tables/columns interactively, create Select/Insert/CustomSQL services -- like Designer | 5 |
 | **JDBC/SAP/OPC adapters** | Create connections, listeners, notifications, query metadata | 20 |
-| **Document type generation** | Generate IS doc types from JSON, JSON Schema, XSD, XML samples, SAP IDoc/RFC | 6 |
+| **Document type generation** | Generate IS doc types from JSON, JSON Schema, XSD, XML, DTD samples, SAP IDoc/RFC | 7 |
+| **Flat file schemas** | Create/read/delete flat file schemas and dictionaries | 4 |
 | **Kafka streaming** | Create Kafka connections, event specifications, triggers | 15 |
 | **JMS messaging** | Create JMS connections and triggers via JNDI providers | 20 |
 | **MQTT messaging** | Create MQTT connections and triggers | 12 |
 | **Pub/Sub triggers** | Manage messaging triggers, inspect status, get stats | 9 |
-| **Messaging connections** | Native IS messaging connection management, CSQ, publishable doc types | 8 |
+| **Messaging** | Connection management, CSQ, publishable doc types, publish/deliver messages | 11 |
 | **Package marketplace** | Browse, search, and install packages from [packages.webmethods.io](https://packages.webmethods.io) | 7 |
 | **Scheduler** | Create/manage scheduled tasks (one-time, repeating, complex) | 10 |
-| **Users & security** | Create users/groups, manage ACLs, keystores, OAuth clients | 24 |
-| **Server admin** | Health, stats, thread dumps, logs, extended settings, license info | 11 |
-| **Packages & namespace** | Full CRUD including delete, info, dependencies, JAR management | 14 |
-| **Ports** | HTTP/FTP/FilePolling/WebSocket listener management | 8 |
-| **URL aliases** | Clean REST URL routing | 3 |
+| **Users & access** | Create users/groups, manage ACLs, assign ACLs to nodes, account locking, default access | 21 |
+| **Server admin** | Health, stats, thread dumps, logs, thread/session kill, SSL cache, license info | 15 |
+| **Packages & namespace** | Full CRUD, settings, compile, dependencies, startup services, JAR management | 21 |
+| **Ports & port access** | HTTP/FTP/FilePolling/WebSocket listener management + per-port access control | 14 |
+| **URL aliases** | Clean REST URL routing with CRUD | 5 |
 | **JDBC pools** | Connection pool CRUD, driver management | 8 |
 | **Global variables** | Configuration variable management | 5 |
 | **Remote servers** | IS-to-IS remote server aliases | 4 |
-| **Web services** | REST/SOAP endpoints, OpenAPI generation | 8 |
+| **Web services** | REST/SOAP endpoint CRUD, OpenAPI generation, connector refresh | 13 |
 | **Auditing** | Audit logger management | 5 |
+| **OAuth** | Client registration, scopes, token management, settings | 9 |
+| **JWT** | Issuer management, global JWT settings | 6 |
+| **SFTP** | Server and user alias management, connection testing | 9 |
+| **HTTP proxy** | Proxy server alias CRUD | 6 |
+| **Cache manager** | Cache CRUD, reset | 6 |
+| **Logger config** | View/change log levels for all loggers, server logging config | 5 |
+| **SAML** | SAML issuer management | 3 |
+| **LDAP** | LDAP server configuration | 4 |
+| **Outbound passwords** | Stored password management for adapter connections | 3 |
+| **Enterprise gateway** | Threat protection rules and DoS settings | 7 |
+| **Security** | Keystores, truststores, security settings, password policy | 6 |
+| **Quiesce mode** | Graceful server drain | 3 |
+| **Health indicators** | Server health indicator management | 3 |
+| **Alerts** | Alert notifier enable/disable/status | 3 |
+| **IP access** | Global IP allow/deny rules | 4 |
+| **WebSocket** | Session management, endpoint creation, broadcast | 4 |
 
-**226 tools + 9 interactive prompts** in total. **146 end-to-end tests** validated against a live IS with real infrastructure (Mosquitto MQTT broker, ActiveMQ JMS, SQL Server).
+**336 tools + 9 interactive prompts + 5 RAG resources** in total. **184 end-to-end tests** validated against a live IS with real infrastructure (Mosquitto MQTT broker, ActiveMQ JMS, MySQL).
 
 ### Interactive setup wizards (prompts)
 
@@ -146,14 +164,30 @@ The AI creates the connection, enables it, verifies connectivity, and sets up a 
 ## How it works
 
 ```
-AI Assistant ──MCP (stdio)──> wm-mcp-server (Rust) ──HTTP/JSON──> webMethods IS (port 5555)
-                                     │
-                                     └──HTTPS──> packages.webmethods.io (marketplace)
+AI Assistant ──MCP (stdio/HTTP)──> wm-mcp-server (Rust) ──HTTP/JSON──> webMethods IS (port 5555)
+                                          │
+                                          └──HTTPS──> packages.webmethods.io (marketplace)
 ```
 
 All operations use IS built-in HTTP services. No filesystem access needed for most operations (marketplace install requires local access to the IS packages directory).
 
-Flow services are created via `wm.server.ns/putNode` which accepts the full flow tree as JSON -- the same `FlowElement` / `Values` serialization used internally by the IS runtime.
+Flow services are created via `wm.server.ns/putNode` which accepts the full flow tree as JSON -- the same `FlowElement` / `Values` serialization used internally by the IS runtime. The server includes 5 embedded RAG resources with comprehensive flow language documentation, 15 working putNode examples (including TRY/CATCH, LOOP, BRANCH, MAPINVOKE, transactions), and adapter service configuration guides.
+
+### Transport modes
+
+- **stdio** (default): Standard MCP stdio transport, works with all MCP clients
+- **HTTP**: `wm-mcp-server --http 8080` starts a Streamable HTTP server at `/mcp` for MCP gateways
+
+### Tool scoping
+
+Set `WM_SCOPES` to restrict which tools are exposed (useful for MCP gateways):
+
+```bash
+WM_SCOPES=develop,monitor  # Only development and monitoring tools
+WM_SCOPES=readonly          # Only read-only tools (list, get, status)
+```
+
+Available scopes: `admin`, `develop`, `deploy`, `adapters`, `messaging`, `monitor`, `network`, `readonly`.
 
 ## Requirements
 
