@@ -494,6 +494,133 @@ Build a search pattern by concatenating prefix + input + suffix.
   ]}
 ]}
 ```
+
+## Example 6: JDBC query result to typed document (listOrders pattern)
+
+Map JDBC adapter output fields to a typed document. Each field uses full nested path.
+
+```json
+{"type":"MAP","mode":"STANDALONE","nodes":[
+  {"type":"MAPCOPY","from":"/selectOrdersOutput;2;0/results;2;0/order_id;1;0","to":"/orders;4;0;mypkg.docTypes:OrderCanonical/id;1;0"},
+  {"type":"MAPCOPY","from":"/selectOrdersOutput;2;0/results;2;0/order_date;1;0","to":"/orders;4;0;mypkg.docTypes:OrderCanonical/date;1;0"},
+  {"type":"MAPCOPY","from":"/selectOrdersOutput;2;0/results;2;0/status;1;0","to":"/orders;4;0;mypkg.docTypes:OrderCanonical/status;1;0"},
+  {"type":"MAPCOPY","from":"/selectOrdersOutput;2;0/results;2;0/customer_id;1;0","to":"/orders;4;0;mypkg.docTypes:OrderCanonical/customer;2;0/id;1;0"},
+  {"type":"MAPCOPY","from":"/selectOrdersOutput;2;0/results;2;0/customer_name;1;0","to":"/orders;4;0;mypkg.docTypes:OrderCanonical/customer;2;0/name;1;0"},
+  {"type":"MAPDELETE","field":"/selectOrdersOutput;2;0"}
+]}
+```
+**Key:** Nested TO paths like `/orders;4;0;.../customer;2;0/name;1;0` create nested doc structures automatically.
+
+## Example 7: JMS message processing (processOrder pattern)
+
+Receive JMS message, extract body, convert to JSON, persist to DB.
+
+```json
+{"flow":{"type":"ROOT","version":"3.2","cleanup":"true","nodes":[
+  {"type":"INVOKE","service":"pub.json:documentToJSON","validate-in":"$none","validate-out":"$none","nodes":[
+    {"type":"MAP","mode":"INPUT","nodes":[
+      {"type":"MAPCOPY","from":"/JMSMessage;4;0;pub.jms:JMSMessage/body;2;0/data;2;0","to":"/document;2;0"}
+    ]},
+    {"type":"MAP","mode":"OUTPUT","nodes":[
+      {"type":"MAPDELETE","field":"/document;2;0"}
+    ]}
+  ]},
+  {"type":"MAP","mode":"STANDALONE","nodes":[
+    {"type":"MAPCOPY","from":"/JMSMessage;4;0;pub.jms:JMSMessage/body;2;0/data;2;0","to":"/order;4;0;mypkg.docTypes:OrderCanonical"},
+    {"type":"MAPDELETE","field":"/JMSMessage;4;0;pub.jms:JMSMessage"}
+  ]},
+  {"type":"INVOKE","service":"mypkg.jdbc:createOrder","validate-in":"$none","validate-out":"$none","nodes":[
+    {"type":"MAP","mode":"INPUT","nodes":[
+      {"type":"MAPCOPY","from":"/order;4;0;mypkg.docTypes:OrderCanonical/id;1;0","to":"/createOrderInput;2;0/order_id;1;0"},
+      {"type":"MAPCOPY","from":"/order;4;0;mypkg.docTypes:OrderCanonical/status;1;0","to":"/createOrderInput;2;0/status;1;0"}
+    ]}
+  ]}
+]}}
+```
+
+## Example 8: HTTP response with JSON body (REST API pattern)
+
+Set HTTP response code, content type, and JSON body for a REST endpoint.
+
+```json
+{"type":"INVOKE","service":"pub.flow:setHTTPResponse","validate-in":"$none","validate-out":"$none","nodes":[
+  {"type":"MAP","mode":"INPUT","nodes":[
+    {"type":"MAPSET","field":"/httpResponse;2;0/responseCode;1;0","overwrite":"true","d_enc":"XMLValues","mapseti18n":"true",
+     "data":"<Values version=\"2.0\"><value name=\"xml\">200</value></Values>"},
+    {"type":"MAPSET","field":"/httpResponse;2;0/reasonPhrase;1;0","overwrite":"true","d_enc":"XMLValues","mapseti18n":"true",
+     "data":"<Values version=\"2.0\"><value name=\"xml\">OK</value></Values>"},
+    {"type":"MAPSET","field":"/httpResponse;2;0/contentType;1;0","overwrite":"true","d_enc":"XMLValues","mapseti18n":"true",
+     "data":"<Values version=\"2.0\"><value name=\"xml\">application/json</value></Values>"}
+  ]}
+]}
+```
+
+## Example 9: JMS send pattern (postOrder)
+
+Convert document to XML, send to JMS queue, return HTTP 202.
+
+```json
+{"flow":{"type":"ROOT","version":"3.2","cleanup":"true","nodes":[
+  {"type":"INVOKE","service":"pub.xml:documentToXMLString","validate-in":"$none","validate-out":"$none","nodes":[
+    {"type":"MAP","mode":"INPUT","nodes":[
+      {"type":"MAPCOPY","from":"/request;4;0;mypkg.docTypes:OrderRequest","to":"/document;2;0"}
+    ]}
+  ]},
+  {"type":"INVOKE","service":"pub.jms:send","validate-in":"$none","validate-out":"$none","nodes":[
+    {"type":"MAP","mode":"INPUT","nodes":[
+      {"type":"MAPSET","field":"/connectionAliasName;1;0","overwrite":"true","d_enc":"XMLValues","mapseti18n":"true",
+       "data":"<Values version=\"2.0\"><value name=\"xml\">DEFAULT_IS_JMS_CONNECTION</value></Values>"},
+      {"type":"MAPSET","field":"/destinationName;1;0","overwrite":"true","d_enc":"XMLValues","mapseti18n":"true",
+       "data":"<Values version=\"2.0\"><value name=\"xml\">/orders/posts</value></Values>"},
+      {"type":"MAPSET","field":"/destinationType;1;0","overwrite":"true","d_enc":"XMLValues","mapseti18n":"true",
+       "data":"<Values version=\"2.0\"><value name=\"xml\">QUEUE</value></Values>"},
+      {"type":"MAPCOPY","from":"/xmldata;1;0","to":"/JMSMessage;2;0/body;2;0/string;1;0"}
+    ]}
+  ]}
+]}}
+```
+
+## Example 10: REST connector with BRANCH on HTTP status code
+
+Call external REST API, branch on response code, map success/error responses.
+
+```json
+{"type":"SEQUENCE","exit-on":"FAILURE","nodes":[
+  {"type":"INVOKE","service":"wm.server.openapi:invoke","validate-in":"$none","validate-out":"$none","nodes":[
+    {"type":"MAP","mode":"INPUT","nodes":[
+      {"type":"MAPSET","field":"/path;1;0","overwrite":"true","d_enc":"XMLValues","mapseti18n":"true",
+       "data":"<Values version=\"2.0\"><value name=\"xml\">/customers</value></Values>"},
+      {"type":"MAPSET","field":"/httpMethod;1;0","overwrite":"true","d_enc":"XMLValues","mapseti18n":"true",
+       "data":"<Values version=\"2.0\"><value name=\"xml\">POST</value></Values>"},
+      {"type":"MAPSET","field":"/radNamespace;1;0","overwrite":"false","d_enc":"XMLValues","mapseti18n":"true",
+       "data":"<Values version=\"2.0\"><value name=\"xml\">mypkg.client:apiDescriptor</value></Values>"}
+    ]}
+  ]},
+  {"type":"BRANCH","switch":"","label-expressions":"true","nodes":[
+    {"type":"SEQUENCE","label":"code = 201","exit-on":"FAILURE","nodes":[
+      {"type":"MAP","mode":"STANDALONE","nodes":[
+        {"type":"MAPCOPY","from":"/response;3;0","to":"/201;2;0"}
+      ]}
+    ]},
+    {"type":"SEQUENCE","label":"code = 400","exit-on":"FAILURE","nodes":[
+      {"type":"MAP","mode":"STANDALONE","nodes":[
+        {"type":"MAPCOPY","from":"/response;3;0","to":"/400;2;0"}
+      ]}
+    ]},
+    {"type":"SEQUENCE","label":"$default","exit-on":"FAILURE","nodes":[
+      {"type":"MAP","mode":"STANDALONE","nodes":[
+        {"type":"MAPCOPY","from":"/response;3;0","to":"/error;2;0"}
+      ]}
+    ]}
+  ]}
+]}
+```
+**Key patterns from real projects (demoOrderManagement, obsCustomerManagement):**
+- JDBC results: `/selectOutput;2;0/results;2;0/column;1;0` -> nested typed doc
+- JMS body: `/JMSMessage;4;0;pub.jms:JMSMessage/body;2;0/data;2;0`
+- HTTP response: `/httpResponse;2;0/responseCode;1;0` etc via MAPSET
+- REST connector: `wm.server.openapi:invoke` with path/method/radNamespace + BRANCH on status code
+- RecordRef copy: `/source;4;0;pkg:DocType` TO `/target;4;0;pkg:DocType` preserves type
 "#;
 
 const ADAPTER_SERVICE_REF: &str = r#"# Adapter Service Configuration Reference

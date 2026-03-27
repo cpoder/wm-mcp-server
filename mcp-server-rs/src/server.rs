@@ -3966,9 +3966,7 @@ impl ServerHandler for WmServer {
         request: CallToolRequestParams,
         context: RequestContext<RoleServer>,
     ) -> Result<CallToolResult, ErrorData> {
-        if !self.scopes.is_empty()
-            && !crate::scopes::is_tool_allowed(&request.name, &self.scopes)
-        {
+        if !self.scopes.is_empty() && !crate::scopes::is_tool_allowed(&request.name, &self.scopes) {
             return Err(ErrorData {
                 code: ErrorCode::INVALID_PARAMS,
                 message: Cow::Owned(format!(
