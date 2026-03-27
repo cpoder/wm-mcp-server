@@ -144,4 +144,119 @@ impl super::ISClient {
         self.invoke_post("wm.sap.Dev:createRFCDocumentType", settings)
             .await
     }
+
+    // ── Package Management Extended (Tier 1 gaps) ────────────────
+
+    pub async fn package_settings(&self, package_name: &str) -> Result<Value, String> {
+        self.invoke_get(&format!(
+            "wm.server.packages/packageSettings?package={package_name}"
+        ))
+        .await
+    }
+
+    pub async fn package_compile(&self, package_name: &str) -> Result<Value, String> {
+        self.invoke_post(
+            "wm.server.packages:compilePackage",
+            &json!({"package": package_name}),
+        )
+        .await
+    }
+
+    pub async fn package_add_depend(
+        &self,
+        package_name: &str,
+        dependency: &str,
+        version: &str,
+    ) -> Result<Value, String> {
+        self.invoke_post(
+            "wm.server.packages:addDepend",
+            &json!({"package": package_name, "dependency": dependency, "version": version}),
+        )
+        .await
+    }
+
+    pub async fn package_del_depend(
+        &self,
+        package_name: &str,
+        dependency: &str,
+    ) -> Result<Value, String> {
+        self.invoke_post(
+            "wm.server.packages:delDepend",
+            &json!({"package": package_name, "dependency": dependency}),
+        )
+        .await
+    }
+
+    pub async fn package_add_startup_service(
+        &self,
+        package_name: &str,
+        service: &str,
+    ) -> Result<Value, String> {
+        self.invoke_post(
+            "wm.server.packages:packageAddStartupService",
+            &json!({"package": package_name, "service": service}),
+        )
+        .await
+    }
+
+    pub async fn package_remove_startup_service(
+        &self,
+        package_name: &str,
+        service: &str,
+    ) -> Result<Value, String> {
+        self.invoke_post(
+            "wm.server.packages:packageRemoveStartupService",
+            &json!({"package": package_name, "service": service}),
+        )
+        .await
+    }
+
+    #[allow(dead_code)]
+    pub async fn package_jar_upload(
+        &self,
+        package_name: &str,
+        jar_path: &str,
+    ) -> Result<Value, String> {
+        self.invoke_post(
+            "wm.server.packages:jarUpload",
+            &json!({"package": package_name, "jarPath": jar_path}),
+        )
+        .await
+    }
+
+    pub async fn package_jar_delete(
+        &self,
+        package_name: &str,
+        jar_name: &str,
+    ) -> Result<Value, String> {
+        self.invoke_post(
+            "wm.server.packages:jarDelete",
+            &json!({"package": package_name, "jar": jar_name}),
+        )
+        .await
+    }
+
+    pub async fn url_alias_update(&self, settings: &Value) -> Result<Value, String> {
+        self.invoke_post("wm.server.httpUrlAlias:updateAlias", settings)
+            .await
+    }
+
+    pub async fn doctype_gen_from_dtd(
+        &self,
+        dtd_string: &str,
+        package_name: &str,
+        ifc_name: &str,
+        record_name: &str,
+    ) -> Result<Value, String> {
+        self.invoke_post(
+            "wm.server.record:generateFromDTDString",
+            &json!({
+                "dtdString": dtd_string,
+                "packageName": package_name,
+                "ifcName": ifc_name,
+                "recordName": record_name,
+            }),
+        )
+        .await
+    }
 }

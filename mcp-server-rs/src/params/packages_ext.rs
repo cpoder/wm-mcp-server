@@ -94,6 +94,64 @@ pub struct SapIDocDocTypeParam {
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct DocTypeGenDtdParam {
+    #[schemars(description = "DTD content string")]
+    pub dtd_string: String,
+    #[schemars(description = "Package name")]
+    pub package_name: String,
+    #[schemars(description = "Folder/interface name")]
+    pub ifc_name: String,
+    #[schemars(description = "Document type name")]
+    pub record_name: String,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct PackageDependParam {
+    #[schemars(description = "Package name")]
+    pub package_name: String,
+    #[schemars(description = "Dependency package name")]
+    pub dependency: String,
+    #[schemars(description = "Version requirement (e.g., \"1.0\")")]
+    pub version: Option<String>,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct PackageStartupServiceParam {
+    #[schemars(description = "Package name")]
+    pub package_name: String,
+    #[schemars(
+        description = "Fully qualified service name (e.g., \"mypkg.services:initService\")"
+    )]
+    pub service: String,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct PackageJarParam {
+    #[schemars(description = "Package name")]
+    pub package_name: String,
+    #[schemars(description = "JAR file name (e.g., \"mylib.jar\")")]
+    pub jar_name: String,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct UrlAliasUpdateParam {
+    #[schemars(
+        description = "JSON string with alias update settings: alias (name), urlPath, package, portList, association"
+    )]
+    pub settings: String,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct SapRfcDocTypeParam {
     #[schemars(description = "SAP system ID (connection alias name)")]
     pub system_id: String,

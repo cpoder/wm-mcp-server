@@ -26,3 +26,21 @@ pub struct OpenApiGenerateParam {
     #[schemars(description = "Target IS instance name (omit for default)")]
     pub instance: Option<String>,
 }
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct WsEndpointAddParam {
+    #[schemars(
+        description = "JSON string with endpoint settings: endpointAlias, transport (HTTP/JMS), url, etc."
+    )]
+    pub settings: String,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct WsEndpointDeleteParam {
+    #[schemars(description = "Endpoint name to delete")]
+    pub endpoint_name: String,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
+}

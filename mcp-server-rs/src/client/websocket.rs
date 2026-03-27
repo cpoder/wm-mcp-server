@@ -16,4 +16,17 @@ impl super::ISClient {
         )
         .await
     }
+
+    pub async fn websocket_endpoint_create(&self, settings: &Value) -> Result<Value, String> {
+        self.invoke_post("wm.server.net.websocket:createWebSocketEndpoint", settings)
+            .await
+    }
+
+    pub async fn websocket_broadcast(&self, port: &str, message: &str) -> Result<Value, String> {
+        self.invoke_post(
+            "wm.server.net.websocket:broadcast",
+            &json!({"port": port, "message": message}),
+        )
+        .await
+    }
 }

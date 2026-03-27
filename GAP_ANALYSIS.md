@@ -1,8 +1,8 @@
-# MCP Server Gap Analysis: v1.0.1 (167 tools) vs Full Designer + IS Admin
+# MCP Server Gap Analysis: v2.5.0 (336 tools) vs Full Designer + IS Admin
 
 ## Current Coverage Summary
 
-167 tools + 9 prompts covering: flow services, adapters (JDBC/SAP/OPC), adapter metadata browsing, streaming/Kafka, JMS, MQTT, JNDI, scheduler, users/groups/ACLs, JDBC pools, global variables, server monitoring, remote servers, auditing, OAuth, web services/OpenAPI, security/keystores, ports.
+336 tools + 9 prompts + 5 RAG resources covering: flow services, adapters (JDBC/SAP/OPC), adapter metadata browsing, streaming/Kafka, JMS, MQTT, JNDI, scheduler, users/groups/ACLs, JDBC pools, global variables, server monitoring, remote servers, auditing, OAuth, web services/OpenAPI, security/keystores, ports, SFTP, proxy, JWT, quiesce, health indicators, alerts, enterprise gateway, IP access, password policy, WebSocket, marketplace, JAR installation, flow debugging, unit testing/mocking, namespace dependencies, flat file schemas, cache manager, SAML, LDAP, logger configuration, outbound passwords, port access control, messaging publish.
 
 ---
 

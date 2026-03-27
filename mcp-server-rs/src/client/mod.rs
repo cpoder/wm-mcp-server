@@ -39,6 +39,15 @@ mod users;
 mod webservices;
 mod websocket;
 
+mod cache;
+mod flatfile;
+mod ldap;
+mod logger;
+mod namespace_deps;
+mod outbound_passwords;
+mod port_access;
+mod saml;
+
 use reqwest::Client;
 use reqwest::header::{ACCEPT, AUTHORIZATION, HeaderMap, HeaderValue};
 use serde_json::{Value, json};

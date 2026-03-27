@@ -3938,6 +3938,1056 @@ impl WmServer {
             "<Values version=\"2.0\"><value name=\"xml\">{escaped}</value></Values>"
         ))
     }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Namespace Dependency Analysis
+    // ═══════════════════════════════════════════════════════════════
+
+    #[tool(description = "Get nodes that depend on the given node (what uses this).")]
+    async fn ns_dep_get_dependents(
+        &self,
+        Parameters(p): Parameters<NsDepNodeParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.ns_dependency_get_dependents(&p.node_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Get nodes that the given node references (what this depends on).")]
+    async fn ns_dep_get_references(
+        &self,
+        Parameters(p): Parameters<NsDepNodeParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.ns_dependency_get_references(&p.node_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Get unresolved references in a package (missing dependencies).")]
+    async fn ns_dep_get_unresolved(
+        &self,
+        Parameters(p): Parameters<NsDepUnresolvedParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.ns_dependency_get_unresolved(&p.package_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Search namespace nodes by name substring. Optional node type filter.")]
+    async fn ns_dep_search(
+        &self,
+        Parameters(p): Parameters<NsDepSearchParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c
+            .ns_dependency_search(&p.search_string, p.node_type.as_deref())
+            .await
+        {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Preview what would change when refactoring (renaming/moving) a namespace node."
+    )]
+    async fn ns_dep_refactor_preview(
+        &self,
+        Parameters(p): Parameters<NsDepRefactorParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c
+            .ns_dependency_refactor_preview(&p.old_name, &p.new_name)
+            .await
+        {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Refactor (rename/move) a namespace node and update all references.")]
+    async fn ns_dep_refactor(
+        &self,
+        Parameters(p): Parameters<NsDepRefactorParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.ns_dependency_refactor(&p.old_name, &p.new_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Flat File Schemas
+    // ═══════════════════════════════════════════════════════════════
+
+    #[tool(description = "Save an XML flat file schema definition.")]
+    async fn flatfile_schema_save(
+        &self,
+        Parameters(p): Parameters<FlatFileSchemaSaveParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c
+            .flatfile_schema_save(&p.xml_content, &p.package_name, &p.schema_name)
+            .await
+        {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Create a flat file dictionary in a package.")]
+    async fn flatfile_dictionary_create(
+        &self,
+        Parameters(p): Parameters<FlatFileDictionaryParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c
+            .flatfile_dictionary_create(&p.package_name, &p.dictionary_name)
+            .await
+        {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Get a flat file schema as XML.")]
+    async fn flatfile_schema_get(
+        &self,
+        Parameters(p): Parameters<FlatFileSchemaParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.flatfile_schema_get(&p.package_name, &p.schema_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Delete a flat file schema.")]
+    async fn flatfile_schema_delete(
+        &self,
+        Parameters(p): Parameters<FlatFileSchemaParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c
+            .flatfile_schema_delete(&p.package_name, &p.schema_name)
+            .await
+        {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Package Management Gaps
+    // ═══════════════════════════════════════════════════════════════
+
+    #[tool(description = "Get package settings (startup services, shutdown services, etc).")]
+    async fn package_settings(
+        &self,
+        Parameters(p): Parameters<PackageNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.package_settings(&p.package_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Compile Java services in a package.")]
+    async fn package_compile(
+        &self,
+        Parameters(p): Parameters<PackageNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.package_compile(&p.package_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Add a package dependency.")]
+    async fn package_add_depend(
+        &self,
+        Parameters(p): Parameters<PackageDependParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let ver = p.version.as_deref().unwrap_or("1.0");
+        match c
+            .package_add_depend(&p.package_name, &p.dependency, ver)
+            .await
+        {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Remove a package dependency.")]
+    async fn package_del_depend(
+        &self,
+        Parameters(p): Parameters<PackageDependParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.package_del_depend(&p.package_name, &p.dependency).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Add a startup service to a package.")]
+    async fn package_add_startup_service(
+        &self,
+        Parameters(p): Parameters<PackageStartupServiceParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c
+            .package_add_startup_service(&p.package_name, &p.service)
+            .await
+        {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Remove a startup service from a package.")]
+    async fn package_remove_startup_service(
+        &self,
+        Parameters(p): Parameters<PackageStartupServiceParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c
+            .package_remove_startup_service(&p.package_name, &p.service)
+            .await
+        {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Delete a JAR file from a package.")]
+    async fn package_jar_delete(
+        &self,
+        Parameters(p): Parameters<PackageJarParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.package_jar_delete(&p.package_name, &p.jar_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // URL Alias Update + DTD DocType Gen
+    // ═══════════════════════════════════════════════════════════════
+
+    #[tool(description = "Update an existing URL alias.")]
+    async fn url_alias_update(
+        &self,
+        Parameters(p): Parameters<UrlAliasUpdateParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let s = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.url_alias_update(&s).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Generate a document type from a DTD string.")]
+    async fn doctype_gen_from_dtd(
+        &self,
+        Parameters(p): Parameters<DocTypeGenDtdParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c
+            .doctype_gen_from_dtd(&p.dtd_string, &p.package_name, &p.ifc_name, &p.record_name)
+            .await
+        {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Messaging Publish
+    // ═══════════════════════════════════════════════════════════════
+
+    #[tool(
+        description = "Publish a document to the messaging system.\n\nSettings: documentTypeName (full ns path), document (the data). Optional: connectionAlias."
+    )]
+    async fn messaging_publish(
+        &self,
+        Parameters(p): Parameters<MessagingPublishParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let s = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.messaging_publish(&s).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Publish a document and wait for all subscribers to process it.\n\nSettings: documentTypeName, document. Optional: connectionAlias, waitTime (ms)."
+    )]
+    async fn messaging_publish_and_wait(
+        &self,
+        Parameters(p): Parameters<MessagingPublishParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let s = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.messaging_publish_and_wait(&s).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Deliver a document directly to a specific service (point-to-point).\n\nSettings: documentTypeName, document, destinationService."
+    )]
+    async fn messaging_deliver(
+        &self,
+        Parameters(p): Parameters<MessagingPublishParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let s = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.messaging_deliver(&s).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Cache Manager (Tier 2)
+    // ═══════════════════════════════════════════════════════════════
+
+    #[tool(description = "List all cache managers configured on the server.")]
+    async fn cache_manager_list(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.cache_manager_list().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Get details of a specific cache manager.")]
+    async fn cache_manager_get(
+        &self,
+        Parameters(p): Parameters<CacheNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.cache_manager_get(&p.name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Create a new cache manager.")]
+    async fn cache_manager_create(
+        &self,
+        Parameters(p): Parameters<CacheSettingsParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let s = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.cache_manager_create(&s).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Update a cache manager configuration.")]
+    async fn cache_manager_update(
+        &self,
+        Parameters(p): Parameters<CacheUpdateParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let s = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.cache_manager_update(&p.name, &s).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Delete a cache manager.")]
+    async fn cache_manager_delete(
+        &self,
+        Parameters(p): Parameters<CacheNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.cache_manager_delete(&p.name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Reset (clear) a named cache.")]
+    async fn cache_reset(
+        &self,
+        Parameters(p): Parameters<CacheNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.cache_reset(&p.name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // SAML Configuration (Tier 2)
+    // ═══════════════════════════════════════════════════════════════
+
+    #[tool(description = "List SAML issuers.")]
+    async fn saml_issuer_list(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.saml_issuer_list().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Add a SAML issuer.\n\nSettings: issuer (entity ID), certificate, etc.")]
+    async fn saml_issuer_add(
+        &self,
+        Parameters(p): Parameters<SamlIssuerAddParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let s = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.saml_issuer_add(&s).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Delete a SAML issuer.")]
+    async fn saml_issuer_delete(
+        &self,
+        Parameters(p): Parameters<SamlIssuerParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.saml_issuer_delete(&p.issuer).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // LDAP Configuration (Tier 2)
+    // ═══════════════════════════════════════════════════════════════
+
+    #[tool(description = "Get LDAP configuration settings.")]
+    async fn ldap_settings_get(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.ldap_settings_get().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Add an LDAP server configuration.\n\nSettings: serverName, host, port, baseDN, bindDN, bindPassword, useTLS."
+    )]
+    async fn ldap_server_add(
+        &self,
+        Parameters(p): Parameters<LdapServerSettingsParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let s = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.ldap_server_add(&s).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Edit an LDAP server configuration.")]
+    async fn ldap_server_edit(
+        &self,
+        Parameters(p): Parameters<LdapServerSettingsParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let s = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.ldap_server_edit(&s).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Delete an LDAP server configuration.")]
+    async fn ldap_server_delete(
+        &self,
+        Parameters(p): Parameters<LdapServerNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.ldap_server_delete(&p.server_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Logger Configuration (Tier 2)
+    // ═══════════════════════════════════════════════════════════════
+
+    #[tool(description = "List all configured loggers and their current log levels.")]
+    async fn logger_list(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.logger_list().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Get a specific logger configuration.")]
+    async fn logger_get(
+        &self,
+        Parameters(p): Parameters<LoggerNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.logger_get(&p.name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Update a logger's settings (e.g., change log level).\n\nSettings: logLevel (Trace/Debug/Info/Warn/Error/Fatal/Off)."
+    )]
+    async fn logger_update(
+        &self,
+        Parameters(p): Parameters<LoggerUpdateParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let s = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.logger_update(&p.name, &s).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Get server-level logging configuration.")]
+    async fn logger_server_config_get(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.logger_server_config_get().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Update server-level logging configuration.")]
+    async fn logger_server_config_update(
+        &self,
+        Parameters(p): Parameters<LoggerServerConfigParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let s = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.logger_server_config_update(&s).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Outbound Passwords (Tier 2)
+    // ═══════════════════════════════════════════════════════════════
+
+    #[tool(description = "Store an outbound password by handle.")]
+    async fn outbound_password_store(
+        &self,
+        Parameters(p): Parameters<OutboundPasswordStoreParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.outbound_password_store(&p.handle, &p.password).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Retrieve an outbound password by handle.")]
+    async fn outbound_password_retrieve(
+        &self,
+        Parameters(p): Parameters<OutboundPasswordHandleParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.outbound_password_retrieve(&p.handle).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Remove an outbound password by handle.")]
+    async fn outbound_password_remove(
+        &self,
+        Parameters(p): Parameters<OutboundPasswordHandleParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.outbound_password_remove(&p.handle).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // ACL Extended (Tier 2)
+    // ═══════════════════════════════════════════════════════════════
+
+    #[tool(description = "Assign an ACL to a namespace node (service, document type, etc).")]
+    async fn acl_assign(
+        &self,
+        Parameters(p): Parameters<AclAssignParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.acl_assign(&p.node_name, &p.acl_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Get list of nodes that have a specific ACL assigned.")]
+    async fn acl_get_nodes(
+        &self,
+        Parameters(p): Parameters<AclNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.acl_get_nodes_for_acl(&p.acl_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Get default access settings for unauthenticated requests.")]
+    async fn acl_get_default_access(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.acl_get_default_access().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Set default access settings for unauthenticated requests.")]
+    async fn acl_set_default_access(
+        &self,
+        Parameters(p): Parameters<AclDefaultAccessParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let s = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.acl_set_default_access(&s).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Account Locking Extended (Tier 2)
+    // ═══════════════════════════════════════════════════════════════
+
+    #[tool(description = "Update account locking settings (lockout threshold, duration, etc).")]
+    async fn account_locking_update(
+        &self,
+        Parameters(p): Parameters<AccountLockingUpdateParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let s = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.account_locking_update(&s).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Reset account locking settings to defaults.")]
+    async fn account_locking_reset(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.account_locking_reset().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "List currently locked user accounts.")]
+    async fn account_locked_list(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.account_locked_list().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Unlock a locked user account.")]
+    async fn account_unlock(
+        &self,
+        Parameters(p): Parameters<UserNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.account_unlock(&p.username).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Server Admin Gaps (Tier 2)
+    // ═══════════════════════════════════════════════════════════════
+
+    #[tool(description = "Change the global IP access type (allow or deny mode).")]
+    async fn ip_access_change_type(
+        &self,
+        Parameters(p): Parameters<IpAccessTypeParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.ip_access_change_type(&p.access_type).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Interrupt a running server thread.")]
+    async fn server_thread_interrupt(
+        &self,
+        Parameters(p): Parameters<ThreadIdParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.server_thread_interrupt(&p.thread_id).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Kill a running server thread (use with caution).")]
+    async fn server_thread_kill(
+        &self,
+        Parameters(p): Parameters<ThreadIdParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.server_thread_kill(&p.thread_id).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Kill a server session.")]
+    async fn server_session_kill(
+        &self,
+        Parameters(p): Parameters<SessionIdParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.server_session_kill(&p.session_id).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Clear the server's SSL cache.")]
+    async fn server_ssl_cache_clear(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.server_ssl_cache_clear().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Enterprise Gateway CRUD (Tier 2)
+    // ═══════════════════════════════════════════════════════════════
+
+    #[tool(description = "Add an enterprise gateway threat protection rule.")]
+    async fn egw_rule_add(
+        &self,
+        Parameters(p): Parameters<EgwRuleAddParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let s = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.egw_rule_add(&s).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Delete an enterprise gateway rule.")]
+    async fn egw_rule_delete(
+        &self,
+        Parameters(p): Parameters<EgwRuleNameParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.egw_rule_delete(&p.rule_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Update an enterprise gateway rule.")]
+    async fn egw_rule_update(
+        &self,
+        Parameters(p): Parameters<EgwRuleAddParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let s = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.egw_rule_update(&s).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Port Access Control (Tier 2)
+    // ═══════════════════════════════════════════════════════════════
+
+    #[tool(description = "List port access configurations.")]
+    async fn port_access_list(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.port_access_list().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Get access control settings for a specific port.")]
+    async fn port_access_get(
+        &self,
+        Parameters(p): Parameters<PortAccessParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.port_access_get(&p.port).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Add IP/hostname nodes to a port's access control list.\n\nSettings: ipAddresses (array), hostNames (array)."
+    )]
+    async fn port_access_add_nodes(
+        &self,
+        Parameters(p): Parameters<PortAccessAddNodesParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let s = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.port_access_add_nodes(&p.port, &s).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Remove an IP/hostname from a port's access control list.")]
+    async fn port_access_delete_node(
+        &self,
+        Parameters(p): Parameters<PortAccessDeleteNodeParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.port_access_delete_node(&p.port, &p.node_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Set the access type for a port (allow or deny).")]
+    async fn port_access_set_type(
+        &self,
+        Parameters(p): Parameters<PortAccessSetTypeParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.port_access_set_type(&p.port, &p.access_type).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Reset a port's access control to defaults.")]
+    async fn port_access_reset(
+        &self,
+        Parameters(p): Parameters<PortAccessParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.port_access_reset(&p.port).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // WebSocket Extended (Tier 2)
+    // ═══════════════════════════════════════════════════════════════
+
+    #[tool(description = "Create a WebSocket endpoint.")]
+    async fn websocket_endpoint_create(
+        &self,
+        Parameters(p): Parameters<WebSocketEndpointCreateParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let s = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.websocket_endpoint_create(&s).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Broadcast a message to all WebSocket clients connected on a port.")]
+    async fn websocket_broadcast(
+        &self,
+        Parameters(p): Parameters<WebSocketBroadcastParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.websocket_broadcast(&p.port, &p.message).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // WS Endpoint CRUD (Tier 2)
+    // ═══════════════════════════════════════════════════════════════
+
+    #[tool(description = "Add a web service consumer endpoint.")]
+    async fn ws_consumer_endpoint_add(
+        &self,
+        Parameters(p): Parameters<WsEndpointAddParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let s = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.ws_consumer_endpoint_add(&s).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Add a web service provider endpoint.")]
+    async fn ws_provider_endpoint_add(
+        &self,
+        Parameters(p): Parameters<WsEndpointAddParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        let s = match parse_json(&p.settings) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
+        match c.ws_provider_endpoint_add(&s).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Delete a web service consumer endpoint.")]
+    async fn ws_consumer_endpoint_delete(
+        &self,
+        Parameters(p): Parameters<WsEndpointDeleteParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.ws_consumer_endpoint_delete(&p.endpoint_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Delete a web service provider endpoint.")]
+    async fn ws_provider_endpoint_delete(
+        &self,
+        Parameters(p): Parameters<WsEndpointDeleteParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.ws_provider_endpoint_delete(&p.endpoint_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(description = "Refresh all web service connectors.")]
+    async fn ws_connector_refresh(
+        &self,
+        Parameters(p): Parameters<InstanceOnlyParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.ws_connector_refresh().await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
 }
 
 impl ServerHandler for WmServer {

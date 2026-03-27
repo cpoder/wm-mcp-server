@@ -2,17 +2,19 @@ use rmcp::schemars;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
-pub struct EgwDosUpdateParam {
-    #[schemars(description = "JSON string with DoS protection settings")]
-    pub settings: String,
+pub struct LoggerNameParam {
+    #[schemars(description = "Logger name (e.g., \"Default\", \"Error\", \"Security\")")]
+    pub name: String,
     #[schemars(description = "Target IS instance name (omit for default)")]
     pub instance: Option<String>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
-pub struct EgwRuleAddParam {
+pub struct LoggerUpdateParam {
+    #[schemars(description = "Logger name")]
+    pub name: String,
     #[schemars(
-        description = "JSON string with enterprise gateway rule settings: ruleName, ruleType, sourceIP, etc."
+        description = "JSON string with logger settings: logLevel (Trace/Debug/Info/Warn/Error/Fatal/Off)"
     )]
     pub settings: String,
     #[schemars(description = "Target IS instance name (omit for default)")]
@@ -20,9 +22,9 @@ pub struct EgwRuleAddParam {
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
-pub struct EgwRuleNameParam {
-    #[schemars(description = "Enterprise gateway rule name")]
-    pub rule_name: String,
+pub struct LoggerServerConfigParam {
+    #[schemars(description = "JSON string with server logging config settings")]
+    pub settings: String,
     #[schemars(description = "Target IS instance name (omit for default)")]
     pub instance: Option<String>,
 }

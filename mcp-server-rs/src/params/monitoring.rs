@@ -18,3 +18,19 @@ pub struct ServerLogParam {
     #[schemars(description = "Target IS instance name (omit for default)")]
     pub instance: Option<String>,
 }
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct ThreadIdParam {
+    #[schemars(description = "Thread ID")]
+    pub thread_id: String,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct SessionIdParam {
+    #[schemars(description = "Session ID")]
+    pub session_id: String,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
+}

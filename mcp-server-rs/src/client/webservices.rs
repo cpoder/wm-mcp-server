@@ -46,4 +46,37 @@ impl super::ISClient {
         self.invoke_post("wm.server.openapi:refreshProvider", settings)
             .await
     }
+
+    // ── WS Endpoint CRUD ─────────────────────────────────────────
+
+    pub async fn ws_consumer_endpoint_add(&self, settings: &Value) -> Result<Value, String> {
+        self.invoke_post("wm.server.ws:addConsumerEndpoint", settings)
+            .await
+    }
+
+    pub async fn ws_provider_endpoint_add(&self, settings: &Value) -> Result<Value, String> {
+        self.invoke_post("wm.server.ws:addProviderEndpoint", settings)
+            .await
+    }
+
+    pub async fn ws_consumer_endpoint_delete(&self, endpoint_name: &str) -> Result<Value, String> {
+        self.invoke_post(
+            "wm.server.ws:deleteConsumerEndpoint",
+            &json!({"endpointName": endpoint_name}),
+        )
+        .await
+    }
+
+    pub async fn ws_provider_endpoint_delete(&self, endpoint_name: &str) -> Result<Value, String> {
+        self.invoke_post(
+            "wm.server.ws:deleteProviderEndpoint",
+            &json!({"endpointName": endpoint_name}),
+        )
+        .await
+    }
+
+    pub async fn ws_connector_refresh(&self) -> Result<Value, String> {
+        self.invoke_post("wm.server.ws:refreshWSConnectors", &json!({}))
+            .await
+    }
 }

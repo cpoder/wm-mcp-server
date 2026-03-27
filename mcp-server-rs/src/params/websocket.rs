@@ -16,3 +16,13 @@ pub struct WebSocketSessionParam {
     #[schemars(description = "Target IS instance name (omit for default)")]
     pub instance: Option<String>,
 }
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct WebSocketBroadcastParam {
+    #[schemars(description = "Port number")]
+    pub port: String,
+    #[schemars(description = "Message to broadcast to all connected WebSocket clients")]
+    pub message: String,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
+}

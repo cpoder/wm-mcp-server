@@ -134,4 +134,21 @@ impl super::ISClient {
         )
         .await
     }
+
+    // ── Messaging Publish ────────────────────────────────────────
+
+    pub async fn messaging_publish(&self, settings: &Value) -> Result<Value, String> {
+        self.invoke_post("wm.server.publish:publish", settings)
+            .await
+    }
+
+    pub async fn messaging_publish_and_wait(&self, settings: &Value) -> Result<Value, String> {
+        self.invoke_post("wm.server.publish:publishAndWait", settings)
+            .await
+    }
+
+    pub async fn messaging_deliver(&self, settings: &Value) -> Result<Value, String> {
+        self.invoke_post("wm.server.publish:deliver", settings)
+            .await
+    }
 }

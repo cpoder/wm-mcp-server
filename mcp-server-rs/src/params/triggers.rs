@@ -48,3 +48,13 @@ pub struct MessagingConnectionNameParam {
     #[schemars(description = "Target IS instance name (omit for default)")]
     pub instance: Option<String>,
 }
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct MessagingPublishParam {
+    #[schemars(
+        description = "JSON string with publish settings: documentTypeName (full ns path to publishable document type), document (the document data to publish). Optional: connectionAlias."
+    )]
+    pub settings: String,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
+}

@@ -56,4 +56,35 @@ impl super::ISClient {
         self.invoke_get("wm.server.query:getCircuitBreakerStats")
             .await
     }
+
+    // ── Server Admin Operations ──────────────────────────────────
+
+    pub async fn server_thread_interrupt(&self, thread_id: &str) -> Result<Value, String> {
+        self.invoke_post(
+            "wm.server.query:interruptThread",
+            &json!({"threadId": thread_id}),
+        )
+        .await
+    }
+
+    pub async fn server_thread_kill(&self, thread_id: &str) -> Result<Value, String> {
+        self.invoke_post(
+            "wm.server.query:killThread",
+            &json!({"threadId": thread_id}),
+        )
+        .await
+    }
+
+    pub async fn server_session_kill(&self, session_id: &str) -> Result<Value, String> {
+        self.invoke_post(
+            "wm.server.admin:killSession",
+            &json!({"sessionID": session_id}),
+        )
+        .await
+    }
+
+    pub async fn server_ssl_cache_clear(&self) -> Result<Value, String> {
+        self.invoke_post("wm.server.admin:clearSSLCache", &json!({}))
+            .await
+    }
 }

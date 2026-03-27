@@ -79,4 +79,55 @@ impl super::ISClient {
         self.invoke_get("wm.server.access:getDisabledUserList")
             .await
     }
+
+    // ── ACL Extended ─────────────────────────────────────────────
+
+    pub async fn acl_assign(&self, node_name: &str, acl_name: &str) -> Result<Value, String> {
+        self.invoke_post(
+            "wm.server.access:aclAssign",
+            &json!({"nodeName": node_name, "aclName": acl_name}),
+        )
+        .await
+    }
+
+    pub async fn acl_get_nodes_for_acl(&self, acl_name: &str) -> Result<Value, String> {
+        self.invoke_post(
+            "wm.server.access:getNodeNameListForAcl",
+            &json!({"aclName": acl_name}),
+        )
+        .await
+    }
+
+    pub async fn acl_get_default_access(&self) -> Result<Value, String> {
+        self.invoke_get("wm.server.access:getDefaultAccess").await
+    }
+
+    pub async fn acl_set_default_access(&self, settings: &Value) -> Result<Value, String> {
+        self.invoke_post("wm.server.access:setDefaultAccess", settings)
+            .await
+    }
+
+    // ── Account Locking Extended ─────────────────────────────────
+
+    pub async fn account_locking_update(&self, settings: &Value) -> Result<Value, String> {
+        self.invoke_post("wm.server.access:updateAccountLockingSettings", settings)
+            .await
+    }
+
+    pub async fn account_locking_reset(&self) -> Result<Value, String> {
+        self.invoke_post("wm.server.access:resetAccountLockingSettings", &json!({}))
+            .await
+    }
+
+    pub async fn account_locked_list(&self) -> Result<Value, String> {
+        self.invoke_get("wm.server.access:listLockedAccounts").await
+    }
+
+    pub async fn account_unlock(&self, username: &str) -> Result<Value, String> {
+        self.invoke_post(
+            "wm.server.access:unlockAccount",
+            &json!({"username": username}),
+        )
+        .await
+    }
 }

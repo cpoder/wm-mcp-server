@@ -66,3 +66,31 @@ pub struct AclNameParam {
     #[schemars(description = "Target IS instance name (omit for default)")]
     pub instance: Option<String>,
 }
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct AclAssignParam {
+    #[schemars(description = "Fully qualified node name (e.g., \"mypkg.services:myService\")")]
+    pub node_name: String,
+    #[schemars(description = "ACL name to assign")]
+    pub acl_name: String,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct AclDefaultAccessParam {
+    #[schemars(description = "JSON string with default access settings")]
+    pub settings: String,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct AccountLockingUpdateParam {
+    #[schemars(
+        description = "JSON string with account locking settings: lockoutEnabled, maxFailedAttempts, lockoutDuration, etc."
+    )]
+    pub settings: String,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
+}

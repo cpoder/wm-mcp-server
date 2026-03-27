@@ -11,8 +11,11 @@ pub fn tool_scope(name: &str) -> &'static [&'static str] {
         n if n.starts_with("user_") || n.starts_with("group_") || n.starts_with("acl_") => {
             &["admin"]
         }
-        "account_locking_get" => &["admin"],
+        n if n.starts_with("account_lock") => &["admin"],
         n if n.starts_with("oauth_") => &["admin"],
+        n if n.starts_with("saml_") => &["admin"],
+        n if n.starts_with("ldap_") => &["admin"],
+        n if n.starts_with("outbound_password_") => &["admin"],
         n if n.starts_with("jwt_") => &["admin"],
         n if n.starts_with("security_")
             || n.starts_with("keystore_")
@@ -32,6 +35,8 @@ pub fn tool_scope(name: &str) -> &'static [&'static str] {
         n if n.starts_with("flow_debug_") => &["develop"],
         n if n.starts_with("test_") || n.starts_with("mock_") => &["develop"],
         n if n.starts_with("doctype_gen_") || n.starts_with("sap_") => &["develop"],
+        n if n.starts_with("ns_dep_") => &["develop"],
+        n if n.starts_with("flatfile_") => &["develop"],
         "node_list" | "node_get" | "node_delete" | "folder_create" => &["develop"],
         n if n.starts_with("package_") => &["develop", "deploy"],
 
@@ -51,6 +56,8 @@ pub fn tool_scope(name: &str) -> &'static [&'static str] {
         n if n.starts_with("audit_") => &["monitor"],
         n if n.starts_with("alert_") => &["monitor"],
         n if n.starts_with("health_") => &["monitor"],
+        n if n.starts_with("logger_") => &["monitor"],
+        n if n.starts_with("cache_") => &["monitor"],
 
         // ── deploy ──────────────────────────────────────────────
         n if n.starts_with("marketplace_") => &["deploy"],
@@ -59,7 +66,7 @@ pub fn tool_scope(name: &str) -> &'static [&'static str] {
         n if n.starts_with("global_var_") => &["deploy"],
 
         // ── network ─────────────────────────────────────────────
-        n if n.starts_with("port_") => &["network"],
+        n if n.starts_with("port_") || n.starts_with("port_access_") => &["network"],
         n if n.starts_with("url_alias_") => &["network"],
         n if n.starts_with("sftp_") => &["network"],
         n if n.starts_with("proxy_") => &["network"],

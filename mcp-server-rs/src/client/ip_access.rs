@@ -13,4 +13,12 @@ impl super::ISClient {
         self.invoke_post("wm.server.net:ipRuleDelete", &json!({"ip": ip}))
             .await
     }
+
+    pub async fn ip_access_change_type(&self, access_type: &str) -> Result<Value, String> {
+        self.invoke_post(
+            "wm.server.net:changeIPAccessType",
+            &json!({"type": access_type}),
+        )
+        .await
+    }
 }

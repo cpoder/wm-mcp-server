@@ -16,3 +16,11 @@ pub struct IpRuleParam {
     #[schemars(description = "Target IS instance name (omit for default)")]
     pub instance: Option<String>,
 }
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct IpAccessTypeParam {
+    #[schemars(description = "Access type: allow or deny")]
+    pub access_type: String,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
+}
