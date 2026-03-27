@@ -439,6 +439,63 @@ Before using RecordRef fields, create the document type:
 3. **Missing document type**: RecordRef (type 4) paths require the document type to exist first
 4. **MAPSET record array wrong format**: Must use `<array name="xml" type="record" depth="1">` not `<value>`
 5. **INVOKE without INPUT/OUTPUT maps**: The INVOKE nodes array should have MAP mode=INPUT and MAP mode=OUTPUT entries
+6. **Type conversion via intermediary variable (STALE VALUE BUG)**: NEVER create an intermediary variable for type conversion (e.g., long→string). If the source is null/empty, the intermediary retains its previous value from an earlier mapping, producing stale data instead of null. ALWAYS use MAPINVOKE as an inline transformer directly in the MAP step. See correct pattern below.
+7. **No null check before transformation**: When converting types (object→string, long→string, etc.), ALWAYS check for null first. A null value passed to a converter may produce unexpected results or exceptions.
+
+### CORRECT: Type conversion with inline MAPINVOKE (no intermediary variable)
+
+Convert a long field directly to a string target using `pub.string:objectToString` as an inline transformer.
+**WRONG approach** (intermediary variable, stale value bug):
+```
+MAP: MAPCOPY /source/longField;3;0 -> /tempObject;3;0   ← intermediary!
+INVOKE: pub.string:objectToString on /tempObject
+MAP: MAPCOPY /value -> /target/stringField;1;0
+```
+If `longField` is null, `/tempObject` may still hold a value from a previous invocation → stale data.
+
+**CORRECT approach** (inline MAPINVOKE, no intermediary):
+```json
+{"type": "MAP", "mode": "STANDALONE", "nodes": [
+  {"type": "MAPINVOKE", "service": "pub.string:objectToString",
+   "validate-in": "$none", "validate-out": "$none", "invoke-order": "0",
+   "nodes": [
+     {"type": "MAP", "mode": "INVOKEINPUT", "nodes": [
+       {"type": "MAPCOPY", "from": "/source/longField;3;0", "to": "/object;3;0"}
+     ]},
+     {"type": "MAP", "mode": "INVOKEOUTPUT", "nodes": [
+       {"type": "MAPCOPY", "from": "/value;1;0", "to": "/target/stringField;1;0"}
+     ]}
+   ]}
+]}
+```
+The MAPINVOKE input/output are scoped to the transformer — no pipeline pollution, no stale values.
+
+**EVEN BETTER: Null-safe type conversion with BRANCH guard:**
+```json
+{"type": "BRANCH", "switch": "/source/longField", "nodes": [
+  {"type": "SEQUENCE", "label": "$null", "exit-on": "FAILURE", "nodes": []},
+  {"type": "MAP", "label": "$default", "mode": "STANDALONE", "nodes": [
+    {"type": "MAPINVOKE", "service": "pub.string:objectToString",
+     "validate-in": "$none", "validate-out": "$none", "invoke-order": "0",
+     "nodes": [
+       {"type": "MAP", "mode": "INVOKEINPUT", "nodes": [
+         {"type": "MAPCOPY", "from": "/source/longField;3;0", "to": "/object;3;0"}
+       ]},
+       {"type": "MAP", "mode": "INVOKEOUTPUT", "nodes": [
+         {"type": "MAPCOPY", "from": "/value;1;0", "to": "/target/stringField;1;0"}
+       ]}
+     ]}
+  ]}
+]}
+```
+This checks for null first (`$null` → do nothing, preserving null in target), only transforms when value exists.
+
+**Common type conversions that need this pattern:**
+- Long/Integer → String: use `pub.string:objectToString` (input: `object;3;0`, output: `value;1;0`)
+- Object → String: use `pub.string:objectToString`
+- String → Integer: use `pub.string:stringToInteger` (input: `inString;1;0`, output: `value;3;0`)
+- Date → String: use `pub.date:formatDate` with pattern
+- Any type mismatch in adapter output: use inline MAPINVOKE, never intermediary variables
 "#;
 
 const PUTNODE_EXAMPLES: &str = r#"# putNode Working Examples
