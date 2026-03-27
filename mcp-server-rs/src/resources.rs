@@ -460,29 +460,47 @@ If `longField` is null, `/tempObject` may still hold a value from a previous inv
    "validate-in": "$none", "validate-out": "$none", "invoke-order": "0",
    "nodes": [
      {"type": "MAP", "mode": "INVOKEINPUT", "nodes": [
-       {"type": "MAPCOPY", "from": "/source/longField;3;0", "to": "/object;3;0"}
+       {"type": "MAPCOPY", "from": "/longField;3;0", "to": "/object;3;0"}
      ]},
      {"type": "MAP", "mode": "INVOKEOUTPUT", "nodes": [
-       {"type": "MAPCOPY", "from": "/value;1;0", "to": "/target/stringField;1;0"}
+       {"type": "MAPCOPY", "from": "/string;1;0", "to": "/target/stringField;1;0"}
      ]}
    ]}
 ]}
 ```
 The MAPINVOKE input/output are scoped to the transformer — no pipeline pollution, no stale values.
 
+**CRITICAL: MAPINVOKE input paths must be FLAT (not deeply nested).** The INVOKEINPUT context does not resolve multi-level nested paths like `/parent/child/field;3;0`. If you need to convert a deeply nested field, first MAPCOPY it to a flat pipeline variable, then use MAPINVOKE on that flat variable:
+```json
+{"type": "MAP", "mode": "STANDALONE", "nodes": [
+  {"type": "MAPCOPY", "from": "/selectOutput;2;0/results;2;0/ORDER_ID;3;0", "to": "/tempOrderId;3;0"},
+  {"type": "MAPINVOKE", "service": "pub.string:objectToString",
+   "validate-in": "$none", "validate-out": "$none", "invoke-order": "0",
+   "nodes": [
+     {"type": "MAP", "mode": "INVOKEINPUT", "nodes": [
+       {"type": "MAPCOPY", "from": "/tempOrderId;3;0", "to": "/object;3;0"}
+     ]},
+     {"type": "MAP", "mode": "INVOKEOUTPUT", "nodes": [
+       {"type": "MAPCOPY", "from": "/string;1;0", "to": "/200/orderId;1;0"}
+     ]}
+   ]},
+  {"type": "MAPDELETE", "field": "/tempOrderId;3;0"}
+]}
+```
+
 **EVEN BETTER: Null-safe type conversion with BRANCH guard:**
 ```json
-{"type": "BRANCH", "switch": "/source/longField", "nodes": [
+{"type": "BRANCH", "switch": "/longField", "nodes": [
   {"type": "SEQUENCE", "label": "$null", "exit-on": "FAILURE", "nodes": []},
   {"type": "MAP", "label": "$default", "mode": "STANDALONE", "nodes": [
     {"type": "MAPINVOKE", "service": "pub.string:objectToString",
      "validate-in": "$none", "validate-out": "$none", "invoke-order": "0",
      "nodes": [
        {"type": "MAP", "mode": "INVOKEINPUT", "nodes": [
-         {"type": "MAPCOPY", "from": "/source/longField;3;0", "to": "/object;3;0"}
+         {"type": "MAPCOPY", "from": "/longField;3;0", "to": "/object;3;0"}
        ]},
        {"type": "MAP", "mode": "INVOKEOUTPUT", "nodes": [
-         {"type": "MAPCOPY", "from": "/value;1;0", "to": "/target/stringField;1;0"}
+         {"type": "MAPCOPY", "from": "/string;1;0", "to": "/target/stringField;1;0"}
        ]}
      ]}
   ]}
@@ -490,12 +508,19 @@ The MAPINVOKE input/output are scoped to the transformer — no pipeline polluti
 ```
 This checks for null first (`$null` → do nothing, preserving null in target), only transforms when value exists.
 
-**Common type conversions that need this pattern:**
-- Long/Integer → String: use `pub.string:objectToString` (input: `object;3;0`, output: `value;1;0`)
-- Object → String: use `pub.string:objectToString`
-- String → Integer: use `pub.string:stringToInteger` (input: `inString;1;0`, output: `value;3;0`)
-- Date → String: use `pub.date:formatDate` with pattern
+**Common type conversions — CORRECT input/output field names:**
+- Long/Integer → String: `pub.string:objectToString` (in: `object;3;0`, out: **`string;1;0`**)
+- Object → String: `pub.string:objectToString` (in: `object;3;0`, out: **`string;1;0`**)
+- String → Integer: `pub.string:stringToInteger` (in: `inString;1;0`, out: `value;3;0`)
+- Date → String: `pub.date:formatDate` (in: `date;3;0` + `pattern;1;0`, out: `value;1;0`)
 - Any type mismatch in adapter output: use inline MAPINVOKE, never intermediary variables
+
+**OAS/REST API services — success vs error response handling:**
+- **Success (200):** Populate the output document directly (e.g., `/200/Order;2;0`). The OAS framework handles the HTTP 200 response automatically. Do NOT call `pub.flow:setHTTPResponse` for success.
+- **Error (404, 500):** Call `pub.flow:setHTTPResponse` with responseCode and JSON error body. Set before EXIT.
+- **CATCH block:** Always call `pub.flow:setHTTPResponse` with 500 + error JSON.
+
+**Flow debugger limitation:** The debugger (`flow_debug_*` tools) cannot step into TRY/CATCH blocks (FORM="TRY"/"CATCH" sequences). To debug business logic inside TRY/CATCH, temporarily remove the TRY/CATCH wrapper or test the inner logic in a separate service.
 "#;
 
 const PUTNODE_EXAMPLES: &str = r#"# putNode Working Examples
@@ -1760,9 +1785,9 @@ Checks if string matches a date format pattern.
 - **Out:** `isDate` (String) - "true"/"false"
 
 ### pub.string:objectToString
-Converts object via Java toString().
+Converts object via Java toString(). CRITICAL: output field is `string`, NOT `value`.
 - **In:** `object` (Object, req)
-- **Out:** `value` (String)
+- **Out:** `string` (String) -- WARNING: this is `string`, not `value` like most other pub.string services
 
 ### pub.string:substitutePipelineVariables
 Replaces pipeline variable references with their values.
