@@ -5,13 +5,13 @@ MCP server for [webMethods Integration Server](https://www.ibm.com/docs/en/webme
 ## Quick Start
 
 ```bash
-npx wm-mcp-server
+npx @wm-mcp-server/cli
 ```
 
 Or install globally:
 
 ```bash
-npm install -g wm-mcp-server
+npm install -g @wm-mcp-server/cli
 ```
 
 ## MCP Client Configuration
@@ -23,7 +23,7 @@ Add to `.mcp.json` in your project:
   "mcpServers": {
     "webmethods-is": {
       "command": "npx",
-      "args": ["-y", "wm-mcp-server"],
+      "args": ["-y", "@wm-mcp-server/cli"],
       "env": {
         "WM_IS_URL": "http://localhost:5555",
         "WM_IS_USER": "Administrator",

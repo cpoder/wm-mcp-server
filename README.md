@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/cpoder/wm-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/cpoder/wm-mcp-server/actions/workflows/ci.yml)
 [![crates.io](https://img.shields.io/crates/v/wm-mcp-server.svg)](https://crates.io/crates/wm-mcp-server)
-[![npm](https://img.shields.io/npm/v/wm-mcp-server.svg)](https://www.npmjs.com/package/wm-mcp-server)
+[![npm](https://img.shields.io/npm/v/@wm-mcp-server/cli.svg)](https://www.npmjs.com/package/@wm-mcp-server/cli)
 
 An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that gives AI assistants full control over [webMethods Integration Server](https://www.ibm.com/docs/en/webmethods-integration/wm-integration-server/11.1.0) -- replacing webMethods Designer for most development and administration tasks.
 
@@ -80,10 +80,10 @@ The AI can guide you step-by-step through setting up:
 
 ```bash
 # Via npx (no install needed)
-npx wm-mcp-server
+npx @wm-mcp-server/cli
 
 # Or install globally via npm
-npm install -g wm-mcp-server
+npm install -g @wm-mcp-server/cli
 
 # Or from crates.io (requires Rust)
 cargo install wm-mcp-server
@@ -103,7 +103,7 @@ Add to `.mcp.json` in your project directory:
   "mcpServers": {
     "webmethods-is": {
       "command": "npx",
-      "args": ["-y", "wm-mcp-server"],
+      "args": ["-y", "@wm-mcp-server/cli"],
       "env": {
         "WM_IS_URL": "http://your-is-host:5555",
         "WM_IS_USER": "Administrator",

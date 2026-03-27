@@ -3,8 +3,8 @@
 ## Installation
 
 ```bash
-npx wm-mcp-server                    # run via npx (no install needed)
-npm install -g wm-mcp-server         # install globally via npm
+npx @wm-mcp-server/cli               # run via npx (no install needed)
+npm install -g @wm-mcp-server/cli    # install globally via npm
 cargo install wm-mcp-server          # from crates.io (requires Rust)
 # or download from https://github.com/cpoder/wm-mcp-server/releases
 ```
