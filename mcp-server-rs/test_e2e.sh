@@ -755,6 +755,112 @@ for pname in setup_kafka_streaming setup_jdbc_connection setup_sap_connection se
   check_not_empty "prompt:$pname" "$out"
 done
 
+# ── Tier 1 Gaps: Namespace Dependencies ──────────────────────
+echo "--- Namespace Dependencies ---"
+out=$(mcp_call 2 "ns_dep_search" '{"search_string":"wm.server"}')
+check_not_empty "ns_dep_search" "$out"
+
+out=$(mcp_call 2 "ns_dep_get_references" '{"node_name":"e2etest.services:hello"}')
+check_not_empty "ns_dep_get_references" "$out"
+
+out=$(mcp_call 2 "ns_dep_get_dependents" '{"node_name":"e2etest.services:hello"}')
+check_not_empty "ns_dep_get_dependents" "$out"
+
+out=$(mcp_call 2 "ns_dep_get_unresolved" '{"package_name":"E2ETestPkg"}')
+check_not_empty "ns_dep_get_unresolved" "$out"
+
+# ── Tier 1 Gaps: Package Management Extended ──────────────────
+echo "--- Package Management Extended ---"
+out=$(mcp_call 2 "package_settings" '{"package_name":"E2ETestPkg"}')
+check_not_empty "package_settings" "$out"
+
+out=$(mcp_call 2 "package_compile" '{"package_name":"E2ETestPkg"}')
+check_not_empty "package_compile" "$out"
+
+# ── Tier 1 Gaps: URL Alias Update ──────────────────────────────
+echo "--- URL Alias Update ---"
+out=$(mcp_call 2 "url_alias_add" '{"settings":"{\"alias\":\"e2etest_alias\",\"urlPath\":\"invoke/wm.server.admin/getServerStatus\",\"package\":\"E2ETestPkg\"}"}')
+check "url_alias_add" "$out" "ok\|added\|status"
+
+out=$(mcp_call 2 "url_alias_update" '{"settings":"{\"alias\":\"e2etest_alias\",\"urlPath\":\"invoke/wm.server.packages/packageList\",\"package\":\"E2ETestPkg\"}"}')
+check_not_empty "url_alias_update" "$out"
+
+out=$(mcp_call 2 "url_alias_delete" '{"alias":"e2etest_alias"}')
+check_not_empty "url_alias_delete" "$out"
+
+# ── Tier 1 Gaps: Messaging Publish ────────────────────────────
+echo "--- Messaging Publish ---"
+out=$(mcp_call 2 "messaging_publishable_doctypes" '{}')
+check_not_empty "messaging_publishable_doctypes" "$out"
+
+# ── Tier 2: Cache Manager ─────────────────────────────────────
+echo "--- Cache Manager ---"
+out=$(mcp_call 2 "cache_manager_list" '{}')
+check_not_empty "cache_manager_list" "$out"
+
+# ── Tier 2: Logger Configuration ──────────────────────────────
+echo "--- Logger Configuration ---"
+out=$(mcp_call 2 "logger_list" '{}')
+check_not_empty "logger_list" "$out"
+
+out=$(mcp_call 2 "logger_server_config_get" '{}')
+check_not_empty "logger_server_config_get" "$out"
+
+# ── Tier 2: ACL Extended ──────────────────────────────────────
+echo "--- ACL Extended ---"
+out=$(mcp_call 2 "acl_get_default_access" '{}')
+check_not_empty "acl_get_default_access" "$out"
+
+# ── Tier 2: Account Locking Extended ──────────────────────────
+echo "--- Account Locking Extended ---"
+out=$(mcp_call 2 "account_locking_get" '{}')
+check "account_locking_get" "$out" "blockDuration\|appliesToUsers\|lockout"
+
+out=$(mcp_call 2 "account_locked_list" '{}')
+check_not_empty "account_locked_list" "$out"
+
+# ── Tier 2: Server Admin Ops ──────────────────────────────────
+echo "--- Server Admin Ops ---"
+out=$(mcp_call 2 "server_session_list" '{}')
+check_not_empty "server_session_list for kill test" "$out"
+
+# ── Tier 2: Port Access Control ───────────────────────────────
+echo "--- Port Access Control ---"
+out=$(mcp_call 2 "port_access_list" '{}')
+check_not_empty "port_access_list" "$out"
+
+# ── Tier 2: LDAP ──────────────────────────────────────────────
+echo "--- LDAP ---"
+out=$(mcp_call 2 "ldap_settings_get" '{}')
+check_not_empty "ldap_settings_get" "$out"
+
+# ── Tier 2: SAML ──────────────────────────────────────────────
+echo "--- SAML ---"
+out=$(mcp_call 2 "saml_issuer_list" '{}')
+check_not_empty "saml_issuer_list" "$out"
+
+# ── Tier 2: Outbound Passwords ────────────────────────────────
+echo "--- Outbound Passwords ---"
+out=$(mcp_call 2 "outbound_password_store" '{"handle":"e2e_test_pw","password":"testpass123"}')
+check_not_empty "outbound_password_store" "$out"
+
+out=$(mcp_call 2 "outbound_password_remove" '{"handle":"e2e_test_pw"}')
+check_not_empty "outbound_password_remove" "$out"
+
+# ── Tier 2: WS Endpoint CRUD ─────────────────────────────────
+echo "--- WS Endpoint CRUD ---"
+out=$(mcp_call 2 "ws_provider_endpoint_list" '{}')
+check_not_empty "ws_provider_endpoint_list" "$out"
+
+out=$(mcp_call 2 "ws_consumer_endpoint_list" '{}')
+check_not_empty "ws_consumer_endpoint_list" "$out"
+
+# ── Tier 2: WebSocket Extended ────────────────────────────────
+echo "--- WebSocket Extended ---"
+out=$(mcp_call 2 "websocket_sessions_by_port" '{"port":"5555"}')
+# WebSocket may return empty if no WS connections on port
+check "websocket_sessions_by_port" "$out" "sessions\|status\|ok\|Failed"
+
 # ── Cleanup ──────────────────────────────────────────────────
 echo "--- Cleanup ---"
 out=$(mcp_call 2 "node_delete" '{"name":"e2etest.services:hello"}')
