@@ -180,10 +180,53 @@ Conditional execution based on a field value.
   "switch": "/fieldName",
   "nodes": [
     {"type": "SEQUENCE", "label": "value1", "nodes": [/* steps */]},
+    {"type": "SEQUENCE", "label": "$null", "nodes": [/* null handling */]},
     {"type": "SEQUENCE", "label": "$default", "nodes": [/* default steps */]}
   ]
 }
 ```
+Special labels: `$null` (value is null), `$default` (fallback), blank (empty string match).
+
+#### BRANCH with label expressions (expression-based branching)
+```json
+{
+  "type": "BRANCH",
+  "label-expressions": "true",
+  "nodes": [
+    {"type": "SEQUENCE", "label": "code = 200", "nodes": [/* success */]},
+    {"type": "SEQUENCE", "label": "code = 400", "nodes": [/* bad request */]},
+    {"type": "SEQUENCE", "label": "name != null && status != null", "nodes": [/* both set */]},
+    {"type": "SEQUENCE", "label": "$default", "nodes": [/* fallback */]}
+  ]
+}
+```
+Expressions support: `=`, `!=`, `null`, `$null`, `&&` (use `&amp;&amp;` in XML), `||`, regex (`/^pattern/`).
+
+#### BRANCH with expression-guarded EXIT (conditional loop break)
+```json
+{
+  "type": "BRANCH", "label-expressions": "true",
+  "nodes": [
+    {"type": "EXIT", "label": "%count% >= %limit%", "from": "$loop", "signal": "SUCCESS"}
+  ]
+}
+```
+
+### REPEAT
+Retry/polling step. Re-executes children up to `count` times.
+```json
+{
+  "type": "REPEAT",
+  "count": "3",
+  "repeat-interval": "5",
+  "repeat-on": "FAILURE",
+  "nodes": [/* steps to retry */]
+}
+```
+- `repeat-on`: `FAILURE` (retry on error) or `SUCCESS` (poll while succeeding)
+- `count`: max retries (`-1` = unlimited). Supports `%variable%` substitution.
+- `repeat-interval`: seconds between retries
+- `back-off`: multiplier for increasing delay between retries
 
 ### SEQUENCE
 Group steps with a label and exit condition.
@@ -192,6 +235,23 @@ Group steps with a label and exit condition.
 ```
 
 Exit-on values: `FAILURE` (stop on first failure, default), `SUCCESS` (stop on first success), `DONE` (run all regardless).
+
+Optional `scope` attribute restricts pipeline visibility:
+```json
+{"type": "SEQUENCE", "scope": "$myScope", "exit-on": "FAILURE", "nodes": [/* steps */]}
+```
+
+#### Try-alternatives pattern (SEQUENCE EXIT-ON="SUCCESS")
+Older alternative to FORM="TRY"/"CATCH". The outer SEQUENCE exits on first success — if the try block succeeds, skip catch:
+```json
+{
+  "type": "SEQUENCE", "exit-on": "SUCCESS",
+  "nodes": [
+    {"type": "SEQUENCE", "label": "try", "exit-on": "FAILURE", "nodes": [/* business logic */]},
+    {"type": "INVOKE", "label": "catch", "service": "pub.flow:getLastError"}
+  ]
+}
+```
 
 ### TRY/CATCH (CRITICAL for production services)
 
@@ -962,6 +1022,150 @@ Clean pipeline keeping only specified variables:
 
 - `preserve` is a String array (field type `1;1`) listing variable names to keep
 - Everything else is removed from the pipeline
+
+## Example 16: REPEAT step (retry on failure with backoff)
+
+Retry a service call up to 3 times with 5-second intervals:
+
+```json
+{
+  "type": "REPEAT", "count": "3", "repeat-interval": "5", "repeat-on": "FAILURE",
+  "nodes": [
+    {"type": "INVOKE", "service": "mypkg.services:callExternalAPI", "validate-in": "$none", "validate-out": "$none"},
+    {"type": "BRANCH", "switch": "/responseCode", "nodes": [
+      {"type": "SEQUENCE", "label": "200", "exit-on": "FAILURE", "nodes": []},
+      {"type": "SEQUENCE", "label": "$default", "exit-on": "FAILURE", "nodes": [
+        {"type": "EXIT", "from": "$parent", "signal": "FAILURE", "failure-message": "API call failed with code %responseCode%"}
+      ]}
+    ]}
+  ]
+}
+```
+
+**REPEAT rules:**
+- `repeat-on: "FAILURE"` = retry when a child fails (retry pattern for transient errors)
+- `repeat-on: "SUCCESS"` = repeat while children succeed (polling pattern, e.g., JMS receive loop)
+- `count`: max retries. `-1` = unlimited. Supports `%variable%` substitution.
+- EXIT inside REPEAT with `from: "$loop"` breaks out of the retry loop
+
+## Example 17: LOOP with conditional limit (process at most N items)
+
+Process items from an array but stop after a configurable limit:
+
+```json
+{
+  "type": "LOOP", "in-array": "/files", "out-array": "/results",
+  "nodes": [
+    {"type": "BRANCH", "label-expressions": "true", "nodes": [
+      {"type": "EXIT", "label": "%processedCount% >= %limit%", "from": "$loop", "signal": "SUCCESS"}
+    ]},
+    {"type": "SEQUENCE", "exit-on": "FAILURE", "nodes": [
+      {"type": "INVOKE", "service": "mypkg.services:processFile", "validate-in": "$none", "validate-out": "$none"},
+      {"type": "MAP", "mode": "STANDALONE", "nodes": [
+        {"type": "MAPINVOKE", "service": "pub.math:addInts", "validate-in": "$none", "validate-out": "$none", "invoke-order": "0",
+         "nodes": [
+           {"type": "MAP", "mode": "INVOKEINPUT", "nodes": [
+             {"type": "MAPCOPY", "from": "/processedCount;1;0", "to": "/num1;1;0"},
+             {"type": "MAPSET", "field": "/num2;1;0", "overwrite": "true",
+              "d_enc": "XMLValues", "mapseti18n": "true",
+              "data": "<Values version=\"2.0\"><value name=\"xml\">1</value></Values>"}
+           ]},
+           {"type": "MAP", "mode": "INVOKEOUTPUT", "nodes": [
+             {"type": "MAPCOPY", "from": "/value;1;0", "to": "/processedCount;1;0"}
+           ]}
+         ]
+        }
+      ]}
+    ]}
+  ]
+}
+```
+
+**Pattern:** BRANCH with `label-expressions: "true"` at the top of the LOOP body acts as a guard. The EXIT label is evaluated as an expression — when it matches, the loop breaks.
+
+## Example 18: BRANCH with expression labels (multi-condition routing)
+
+Route processing based on complex conditions:
+
+```json
+{
+  "type": "BRANCH", "label-expressions": "true",
+  "nodes": [
+    {"type": "SEQUENCE", "label": "name != null &amp;&amp; status != null", "exit-on": "FAILURE",
+     "comment": "both name and status provided",
+     "nodes": [{"type": "INVOKE", "service": "mypkg.services:searchByNameAndStatus"}]},
+    {"type": "SEQUENCE", "label": "name != null", "exit-on": "FAILURE",
+     "comment": "only name provided",
+     "nodes": [{"type": "INVOKE", "service": "mypkg.services:searchByName"}]},
+    {"type": "SEQUENCE", "label": "status != null", "exit-on": "FAILURE",
+     "comment": "only status provided",
+     "nodes": [{"type": "INVOKE", "service": "mypkg.services:searchByStatus"}]},
+    {"type": "SEQUENCE", "label": "$default", "exit-on": "FAILURE",
+     "nodes": [{"type": "INVOKE", "service": "mypkg.services:searchAll"}]}
+  ]
+}
+```
+
+**Expression syntax:** `= value`, `!= null`, `== $null`, `&amp;&amp;` (AND), `||` (OR), regex `/^pattern/`.
+First matching expression wins. `$default` is the fallback.
+
+## Example 19: SOAP client call (WSD connector pattern)
+
+Structure generated by IS when consuming a WSDL:
+
+```json
+{
+  "type": "SEQUENCE", "exit-on": "FAILURE",
+  "nodes": [
+    {"type": "MAP", "mode": "STANDALONE", "comment": "set operation",
+     "nodes": [
+       {"type": "MAPSET", "field": "/wsdOperationName;1;0", "overwrite": "true",
+        "d_enc": "XMLValues", "mapseti18n": "true",
+        "data": "<Values version=\"2.0\"><value name=\"xml\">getCustomer</value></Values>"}
+     ]},
+    {"type": "MAP", "mode": "STANDALONE", "comment": "map request to SOAP body",
+     "nodes": [
+       {"type": "MAPCOPY", "from": "/request;4;0;mypkg.docTypes:getCustomerInput", "to": "/request;2;0/getCustomer;2;0"},
+       {"type": "MAPSET", "field": "/soapProtocol;1;0", "overwrite": "true",
+        "d_enc": "XMLValues", "mapseti18n": "true",
+        "data": "<Values version=\"2.0\"><value name=\"xml\">SOAP 1.1 Protocol</value></Values>"}
+     ]},
+    {"type": "INVOKE", "service": "pub.client:soapClient", "validate-in": "$none", "validate-out": "$none",
+     "nodes": [
+       {"type": "MAP", "mode": "INPUT", "nodes": [
+         {"type": "MAPSET", "field": "/method;2;0/localName;1;0", "overwrite": "true",
+          "d_enc": "XMLValues", "mapseti18n": "true",
+          "data": "<Values version=\"2.0\"><value name=\"xml\">getCustomer</value></Values>"}
+       ]}
+     ]},
+    {"type": "BRANCH", "switch": "/soapStatus", "comment": "check SOAP success/fault",
+     "nodes": [
+       {"type": "SEQUENCE", "label": "0", "exit-on": "FAILURE", "comment": "success",
+        "nodes": [
+          {"type": "MAP", "mode": "STANDALONE", "nodes": [
+            {"type": "MAPCOPY", "from": "/response;2;0/getCustomerResponse;2;0", "to": "/result;4;0;mypkg.docTypes:getCustomerOutput"},
+            {"type": "MAPDELETE", "field": "/response;2;0"},
+            {"type": "MAPDELETE", "field": "/soapStatus;1;0"}
+          ]}
+        ]},
+       {"type": "SEQUENCE", "label": "$default", "exit-on": "FAILURE", "comment": "SOAP fault",
+        "nodes": [
+          {"type": "MAP", "mode": "STANDALONE", "nodes": [
+            {"type": "MAPCOPY", "from": "/response;2;0/fault;2;0", "to": "/fault;2;0"},
+            {"type": "MAPDELETE", "field": "/response;2;0"}
+          ]}
+        ]}
+     ]}
+  ]
+}
+```
+
+**SOAP client pattern (from Tundra, IBM WxMCPServer):**
+- `pub.client:soapClient` is the IS built-in SOAP invoker
+- `soapStatus=0` means success, anything else is a SOAP fault
+- Request: map typed doc -> `/request;2;0/operationName;2;0`
+- Response: extract from `/response;2;0/operationNameResponse;2;0`
+- Fault: extract from `/response;2;0/fault;2;0`
 "#;
 
 const ADAPTER_SERVICE_REF: &str = r#"# Adapter Service Configuration Reference
@@ -1838,6 +2042,44 @@ Converts an IData document to a JSON string.
 Parses a JSON string into an IData document.
 - **In:** `jsonString` (String, req)
 - **Out:** `document` (Document - the parsed IData)
+
+---
+
+## pub.client (HTTP/SOAP/FTP Client Services)
+
+### pub.client:soapClient
+Invokes a SOAP web service endpoint.
+- **In:** `request` (Document - SOAP body), `method` (Document - `localName`, `nsURI`), `soapAction` (String), `address` (String, opt - endpoint URL), `soapProtocol` (String - "SOAP 1.1 Protocol" or "SOAP 1.2 Protocol"), `wsdBinderName` (String, opt)
+- **Out:** `response` (Document - SOAP response body), `soapStatus` (String - "0"=success, "1"=fault), `header` (Document - HTTP headers)
+- **Note:** `soapStatus=0` is success. Check via BRANCH on `/soapStatus`. Fault details in `/response/fault`.
+
+### pub.client:http
+Sends an HTTP request (GET, POST, PUT, DELETE, etc.).
+- **In:** `url` (String, req), `method` (String - GET/POST/PUT/DELETE), `data` (Object/String/InputStream), `headers` (Document), `auth` (Document - `type`, `user`, `pass`), `encodingType` (String)
+- **Out:** `header` (Document), `body` (Object), `statusCode` (String), `statusMessage` (String)
+
+### pub.client.ftp:login
+Opens FTP connection.
+- **In:** `serverhost` (String), `serverport` (String, default "21"), `username` (String), `password` (String), `transfertype` (String - "ascii"/"binary"), `newSession` (String - "true"/"false"), `secure` (String - "true" for FTPS)
+- **Out:** (session is stored internally)
+
+### pub.client.ftp:get
+Downloads file via FTP.
+- **In:** `remoteFile` (String - path on server), `localFile` (String, opt - local path)
+- **Out:** `content` (InputStream if no localFile), `status` (String)
+
+### pub.client.ftp:put
+Uploads file via FTP.
+- **In:** `remoteFile` (String), `content` (InputStream/String/bytes), `mode` (String - "ascii"/"binary")
+- **Out:** `status` (String)
+
+### pub.client.ftp:logout
+Closes FTP session.
+- **In:** (none)
+- **Out:** (none)
+
+### pub.client.sftp:login / put / get / logout
+Same pattern as FTP but for SFTP connections. Uses `serverAlias` or explicit credentials.
 
 ---
 

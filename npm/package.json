@@ -1,6 +1,6 @@
 {
   "name": "@wm-mcp-server/cli",
-  "version": "2.7.0",
+  "version": "2.8.0",
   "description": "MCP server for webMethods Integration Server — 336 tools replacing Designer for development and administration",
   "license": "MIT",
   "repository": {
