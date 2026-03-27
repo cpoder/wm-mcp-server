@@ -187,6 +187,6 @@ jobs:
           curl -sSfL -o /dev/null -w "%{http_code}" "$URL"
 
       - name: Publish to npm
-        run: cd npm && npm publish
+        run: cd npm && npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
