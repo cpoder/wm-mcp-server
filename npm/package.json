@@ -1,0 +1,36 @@
+{
+  "name": "wm-mcp-server",
+  "version": "2.6.0",
+  "description": "MCP server for webMethods Integration Server — 336 tools replacing Designer for development and administration",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cpoder/wm-mcp-server"
+  },
+  "homepage": "https://github.com/cpoder/wm-mcp-server",
+  "keywords": [
+    "webmethods",
+    "integration-server",
+    "mcp",
+    "model-context-protocol",
+    "ibm",
+    "flow-services",
+    "adapter",
+    "middleware"
+  ],
+  "bin": {
+    "wm-mcp-server": "./run.js"
+  },
+  "scripts": {
+    "postinstall": "node ./install.js"
+  },
+  "files": [
+    "install.js",
+    "run.js",
+    "binary.js",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=16"
+  }
+}

@@ -155,3 +155,38 @@ jobs:
       - run: cargo publish --manifest-path mcp-server-rs/Cargo.toml --allow-dirty
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+  publish-npm:
+    name: Publish to npm
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Set npm version from tag
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          cd npm
+          node -e "
+            const pkg = require('./package.json');
+            pkg.version = '${VERSION}';
+            require('fs').writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+          echo "Publishing wm-mcp-server@${VERSION}"
+
+      - name: Verify download URL works
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          URL="https://github.com/cpoder/wm-mcp-server/releases/download/v${VERSION}/wm-mcp-server-linux-x86_64"
+          echo "Checking $URL"
+          curl -sSfL -o /dev/null -w "%{http_code}" "$URL"
+
+      - name: Publish to npm
+        run: cd npm && npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
