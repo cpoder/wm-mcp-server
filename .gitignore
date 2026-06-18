@@ -14,3 +14,6 @@ Thumbs.db
 
 # Env files with secrets
 .env
+
+# Decompiler tool (not part of the project)
+cfr.jar
