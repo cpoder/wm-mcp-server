@@ -96,8 +96,7 @@ impl ISClient {
             .send()
             .await
             .map_err(|e| e.to_string())?;
-        r.error_for_status_ref().map_err(|e| e.to_string())?;
-        let text = r.text().await.map_err(|e| e.to_string())?;
+        let text = read_checked(r).await?;
         if text.trim().is_empty() {
             Ok(json!({"status": "ok"}))
         } else {
@@ -117,12 +116,31 @@ impl ISClient {
             .send()
             .await
             .map_err(|e| e.to_string())?;
-        r.error_for_status_ref().map_err(|e| e.to_string())?;
-        let text = r.text().await.map_err(|e| e.to_string())?;
+        let text = read_checked(r).await?;
         if text.trim().is_empty() {
             Ok(json!({"status": "ok"}))
         } else {
             serde_json::from_str(&text).map_err(|e| e.to_string())
+        }
+    }
+}
+
+/// Read a response body, converting any non-2xx status into an error that
+/// INCLUDES the IS response body. webMethods returns the real cause of a
+/// failure (invalid WmPath, missing document type, flow-compiler stack
+/// trace, "node already exists", ...) in the body; `error_for_status` drops
+/// it, leaving the caller with only a generic "500" it cannot act on.
+pub(crate) async fn read_checked(r: reqwest::Response) -> Result<String, String> {
+    let status = r.status();
+    let body = r.text().await.map_err(|e| e.to_string())?;
+    if status.is_success() {
+        Ok(body)
+    } else {
+        let snippet: String = body.trim().chars().take(2000).collect();
+        if snippet.is_empty() {
+            Err(format!("HTTP {status}"))
+        } else {
+            Err(format!("HTTP {status}: {snippet}"))
         }
     }
 }

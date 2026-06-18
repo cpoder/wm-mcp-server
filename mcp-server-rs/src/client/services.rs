@@ -12,8 +12,7 @@ impl super::ISClient {
             .send()
             .await
             .map_err(|e| e.to_string())?;
-        r.error_for_status_ref().map_err(|e| e.to_string())?;
-        let text = r.text().await.map_err(|e| e.to_string())?;
+        let text = super::read_checked(r).await?;
         let truncated: String = text.chars().take(500).collect();
         Ok(json!({"status": "ok", "response": truncated}))
     }
@@ -40,7 +39,7 @@ impl super::ISClient {
             .send()
             .await
             .map_err(|e| e.to_string())?;
-        r.error_for_status_ref().map_err(|e| e.to_string())?;
+        super::read_checked(r).await?;
         Ok(json!({"status": "created", "service": service_path, "package": package}))
     }
 
@@ -56,8 +55,7 @@ impl super::ISClient {
             self.client.get(&url).send().await
         }
         .map_err(|e| e.to_string())?;
-        r.error_for_status_ref().map_err(|e| e.to_string())?;
-        let text = r.text().await.map_err(|e| e.to_string())?;
+        let text = super::read_checked(r).await?;
         if text.trim().is_empty() {
             Ok(json!({"status": "invoked"}))
         } else {
@@ -83,7 +81,7 @@ impl super::ISClient {
             .send()
             .await
             .map_err(|e| e.to_string())?;
-        r.error_for_status_ref().map_err(|e| e.to_string())?;
+        super::read_checked(r).await?;
         Ok(json!({"status": "created", "document": doc_path, "package": package}))
     }
 }

@@ -39,7 +39,7 @@ impl super::ISClient {
             .send()
             .await
             .map_err(|e| e.to_string())?;
-        r.error_for_status_ref().map_err(|e| e.to_string())?;
+        super::read_checked(r).await?;
         Ok(json!({"status": "deleted", "node": name}))
     }
 
@@ -55,7 +55,7 @@ impl super::ISClient {
             .send()
             .await
             .map_err(|e| e.to_string())?;
-        r.error_for_status_ref().map_err(|e| e.to_string())?;
+        super::read_checked(r).await?;
         Ok(json!({"status": "created", "folder": folder_path, "package": package}))
     }
 }
