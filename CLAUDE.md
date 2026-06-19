@@ -45,6 +45,13 @@ sers-t'en de modèle.
 
 ## Règles de contenu `put_node` (sources fréquentes de 500)
 
+- **Jamais de préfixe avec le nom du package (LA cause des 500)** : `node_nsName`
+  est un chemin de **dossiers** + service (`dossier.sousDossier:service`) ; il ne
+  contient JAMAIS le nom du package, lequel va uniquement dans `node_pkg`.
+  Correct : `node_nsName = commandes.api:creer` + `node_pkg = MonPackage`.
+  FAUX : `node_nsName = MonPackage.commandes.api:creer` → 500. Même règle pour
+  `folder_create`, `document_type_create`, `node_delete` : le chemin ne contient
+  jamais le package.
 - **Identité** : `node_nsName` = `"dossier.sousDossier:nomService"`, `node_pkg`
   = nom du package, `node_type` = `"service"`, `svc_type` = `"flow"`,
   `svc_subtype` = `"default"`, `svc_sigtype` = `"java 3.5"`.

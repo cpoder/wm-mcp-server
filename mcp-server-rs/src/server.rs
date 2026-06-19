@@ -5097,6 +5097,8 @@ impl ServerHandler for WmServer {
                 "and 'wm://docs/putnode-examples' for tested working JSON patterns. Read 'wm://docs/builtin-services' for service signatures.\n\n",
                 "Key rules:\n",
                 "- Services are identified by \"folder.subfolder:serviceName\" paths\n",
+                "- NEVER prefix node_nsName with the package name; the package goes ONLY in node_pkg\n",
+                "  (node_nsName is the folder path + service, e.g. orders.api:create, NOT MyPackage.orders.api:create -- prefixing the path with the package causes a 500)\n",
                 "- put_node is the core API for creating/updating flow services with full logic\n",
                 "- sig_in/sig_out MUST have javaclass:\"com.wm.util.Values\"\n",
                 "- WmPath: /fieldName;type;dim where type: 1=String, 2=Record, 3=Object, 4=RecordRef\n",

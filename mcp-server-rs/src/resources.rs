@@ -67,6 +67,17 @@ pub fn read(uri: &str) -> Option<ReadResourceResult> {
 
 const FLOW_LANGUAGE_REF: &str = r#"# Flow Language Reference for putNode API
 
+## Node naming (CRITICAL -- common 500 cause)
+
+A service is named by its **folder path**: `folder.subfolder:serviceName`. This is NOT the package.
+NEVER prefix `node_nsName` with the package name -- the package is passed separately in `node_pkg`.
+Folders and packages are different concepts: a node lives *in* a package but is *named* by its folder path.
+
+- Correct:     `node_nsName = "orders.api:create"`, `node_pkg = "MyPackage"`
+- WRONG (500): `node_nsName = "MyPackage.orders.api:create"` (or `"MyPackage:orders.api:create"`)
+
+The same applies to `folder_create`, `document_type_create` and `node_delete`: the path never contains the package name.
+
 ## WmPath Format
 
 All field references in flow services use WmPath format: `/fieldName;type;dim[;docTypeRef][/nestedPath]`
