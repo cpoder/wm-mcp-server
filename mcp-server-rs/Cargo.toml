@@ -1,6 +1,6 @@
 [package]
 name = "wm-mcp-server"
-version = "2.9.0"
+version = "2.9.1"
 edition = "2024"
 description = "MCP server for webMethods Integration Server — 336 tools replacing Designer for development and administration"
 license = "MIT"
