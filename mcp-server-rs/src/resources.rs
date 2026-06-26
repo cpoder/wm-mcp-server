@@ -40,7 +40,147 @@ pub const RESOURCES: &[DocResource] = &[
         description: "Input/output signatures for commonly used IS built-in services: pub.string (concat, replace, substring, etc.), pub.math (addInts, multiplyFloats, etc.), pub.list (appendToDocumentList, etc.), pub.date (formatDate, etc.), pub.flow (debugLog, getLastError, etc.).",
         content: BUILTIN_SERVICES_REF,
     },
+    DocResource {
+        uri: "wm://docs/onprem-provisioning",
+        name: "On-Prem Provisioning, Database & JDBC Setup",
+        description: "How to install add-on products (Trading Networks, EDIINT/AS2, EDI) with the IBM Installer in CLI mode, apply fixes with Update Manager (SUM), create database components with the Database Configurator (DCC) for PostgreSQL, and wire JDBC pools + functional aliases. Captures non-obvious gotchas: the PTY-required installer password prompt, the updateFunctionalAlias isolationlevel requirement, and the IS-restart-required rule for Trading Networks.",
+        content: ONPREM_PROVISIONING_REF,
+    },
 ];
+
+const ONPREM_PROVISIONING_REF: &str = r#"# On-Prem Provisioning, Database & JDBC Configuration
+
+Operational runbook for standing up Integration Server features that are NOT
+exposed as MCP tools (they run via the platform's own CLIs). The gotchas below
+are easy to miss and cost hours.
+
+## 1. Install add-on products (Trading Networks, EDIINT/AS2, EDI)
+
+- Use the IBM webMethods **Installer** (e.g. `IBM_webM_Install_Linux_x64.bin`),
+  NOT Update Manager. Update Manager only applies FIXES to already-installed
+  products; the Installer adds NEW products.
+- Run it in console mode: `installer.bin -console` (launches the SAG DistMan
+  installer `com.wm.distman.install.DistManInstallMain`; the bin forwards args).
+- CRITICAL: the credential prompt uses a no-echo reader that needs a REAL TTY.
+  A plain pipe/FIFO yields an empty password ("Enter a user name and password"
+  loop). Drive it under a pseudo-TTY:
+  `script -qefc 'installer.bin -console' typescript.log` and feed stdin via a
+  FIFO kept open by a background writer (so the reader never sees EOF).
+- Auth: `empowerUser` = your IBM/Empower account (often already stored in
+  `<sumdir>/UpdateManager/conf/preferences` as `empowerUser=...`); password =
+  the entitlement key (an IBM Marketplace JWT).
+- Choose the EXISTING install dir; pick "Install packages on existing instance".
+- Selecting EDIINT auto-selects "Trading Networks Server" (dependency).
+- Selecting the EDI module auto-selects ALL standard schema libraries (~6 GB).
+  Toggle OFF the "Schemas" node to keep only EDI Program Files (~260 MB total).
+- "Use sudo? N" for headless (daemon registration is optional if IS runs as the
+  install user). Finish with `F`.
+- Result packages: WmTN, WmEDIINT, WmEDIforTN, WmEDI.
+
+## 2. Apply fixes (Update Manager / SUM) -- do this BEFORE the DB step
+
+Fixes can update the DB component scripts, so patch before running DCC.
+
+- `<sumdir>/bin/UpdateManagerCMD.sh -installDir <dir> -empowerUser <u> -empowerPass <entitlementKey>`
+- Cheap validation of token + network without installing:
+  `-action viewAvailableFixes -installDir <dir> -empowerUser <u> -empowerPass <key>`.
+- Interactive install path: Install and Uninstall Fixes -> Install fixes from
+  Passport Advantage Online (PAO) -> "Create script? N" -> select "All fixes"
+  (item 1) -> continue past the shutdown warning. IS/MWS/UM must be DOWN.
+- Drive it under a PTY too (same `script` technique) if a no-echo prompt appears,
+  though passing `-empowerPass` as an arg avoids the password prompt.
+- A "Post Install Messages" note about fixes for products you don't have (e.g.
+  Optimize InfrastructureDC) is safe to ignore.
+
+## 3. Create database components (Database Configurator / DCC)
+
+- Tool: `<install>/common/db/bin/dbConfigurator.sh`.
+  Discovery flags: `-pd` (DB types), `-pp` (products), `-pc` (components),
+  `-pa` (actions).
+- PostgreSQL is supported (`-d postgresql`). webMethods BUNDLES its own
+  DataDirect driver at `<install>/common/lib/ext/dd-cjdbc.jar` (already on the
+  DCC and IS classpath) -- do NOT add an external PostgreSQL driver.
+- Use the DataDirect/webMethods JDBC URL format, NOT the open-source one:
+    jdbc:wm:postgresql://<host>:<port>;databaseName=<db>
+  (the open-source `jdbc:postgresql://host:port/db` is only for ad-hoc tooling.)
+- The database itself must already exist; DCC creates the component TABLES in it,
+  not the database. Create a dedicated DB (e.g. `wm12`) so it does not collide
+  with an older install's schema.
+- Create per product at the latest level:
+    dbConfigurator.sh -a create -d postgresql -pr TN  -v latest \
+      -l "jdbc:wm:postgresql://localhost:5432;databaseName=wm12" \
+      -u <user> -p <pwd> -au <admin> -ap <adminPwd>
+  Products: `TN` (Trading Networks), `IS` (Integration Server),
+  `MWS` (My webMethods Server). Look for "status : complete".
+
+## 4. Wire the database to IS (JDBC pool + functional aliases)
+
+- Create a pool (MCP `jdbc_pool_add`):
+  drivers = "DataDirect Connect JDBC PostgreSQL Driver",
+  url = "jdbc:wm:postgresql://host:5432;databaseName=<db>".
+  Validate first with `jdbc_pool_test`.
+- Map functional aliases to the pool via the service
+  `wm.server.jdbcpool:updateFunctionalAlias` (no dedicated MCP tool).
+  CRITICAL GOTCHA: passing only {function, pool} is SILENTLY IGNORED -- the
+  association does not persist. You MUST also pass `isolationlevel`.
+  Working call:
+    service_invoke wm.server.jdbcpool:updateFunctionalAlias
+      {"function":"TN","pool":"<pool>","isolationlevel":"-1"}
+  Verify with `wm.server.jdbcpool:getFunctionalAlias {"function":"TN"}` ->
+  `function.pool` must be set. The on-disk proof is
+  `config/jdbc/function/<Alias>.xml`.
+- For Trading Networks map the `TN` alias; also map `ISCoreAudit`,
+  `DocumentHistory`, and `Xref` (used by TN/EDI) to the same pool.
+
+## 5. Restart IS after configuring the TN alias -- a reload is NOT enough
+
+Trading Networks reads its pool only at package init. If IS first started
+without the alias, TN failed and left `JobMgrFactory.registry` / the ehcache
+`CacheManager` null. A `package_reload WmTN` then keeps failing with
+"Trading Networks database pool is not configured". Only a FULL Integration
+Server restart inits TN cleanly against the DB. (A harmless UM
+"Realm is currently not reachable" error at startup is fine -- AS2/TN use HTTP,
+not Universal Messaging.)
+
+## Known issue: TN datastore init fails on PostgreSQL ("could not retrieve data")
+
+Symptom: WmTN loads cleanly (hundreds of services, 0 load errors) but at startup TN
+logs `DatastoreException: Trading Networks could not retrieve data from your database`
+then `NullPointerException ... ehcache CacheManager ... is null`, and TN is disabled.
+The thrown `com.wm.util.BasisSQLException` has an EMPTY message.
+
+Diagnosis (traced with DataDirect spy logging -- set `spyenabled=true` in
+config/jdbc/pool/<pool>.xml, restart, read logs/spy/<pool>.log): TN's
+`Datastore.getDBMetaData()` opens the connection and the JDBC metadata calls all
+SUCCEED (`getMetaData`/`getDatabaseProductName` -> "PostgreSQL", driver 6.0.0, DB
+16.14), but the method throws the empty SQLException BEFORE issuing any SQL -- there
+is NO prepareStatement/executeQuery in the spy trace and NO error in the PostgreSQL
+server log. The throw originates inside TN's `SQLStatements.getSql("version.select")`.
+
+Ruled out (don't waste time re-checking):
+- DB schema: DCC `-pr TN/IS/MWS` completes; 203 tables incl. bizdoc, is_datastore.
+- Connectivity: `jdbc_pool_test` and the admin "Test" both succeed.
+- PostgreSQL version: fails identically on PG16 and PG17 (the DataDirect "This driver
+  is locked for use with embedded applications" message only appears for
+  EXTERNAL/standalone use of the OEM driver -- expected, NOT the IS-side cause).
+- The TNModelVersion row: `version.select` reads it, but inserting it
+  (`INSERT INTO TNModelVersion(MajorVersion,MinorVersion) VALUES (85,0)`) does NOT fix
+  startup -- TN throws UPSTREAM of that query. DCC never populates this row (no SQL
+  script inserts it; TN writes it itself via `Datastore.setVersion`, only during a
+  config import).
+- Jar conflicts: the two tncore.jar (install-level + instance-level) are
+  byte-identical and both define the `version.select` key.
+- Package load: WmTN itself loads with 0 errors.
+
+Separately, WmEDIforTN and WmEDI may fail to load ("circular dependencies" / "system
+package depends on non-system package") when older EDI/EDIINT module versions are
+added to a 12.1 install -- a different problem affecting EDI-over-TN, not the core
+TN datastore.
+
+Status: unresolved/environment-specific. Next steps: open an IBM support case with the
+spy trace, or point the TN functional alias at the embedded (Derby) datastore to
+isolate whether the defect is DataDirect/PostgreSQL-specific.
+"#;
 
 pub fn list() -> Vec<Resource> {
     RESOURCES
