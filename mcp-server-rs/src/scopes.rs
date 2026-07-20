@@ -26,18 +26,24 @@ pub fn tool_scope(name: &str) -> &'static [&'static str] {
         n if n.starts_with("password_policy_") => &["admin"],
         n if n.starts_with("quiesce_") => &["admin"],
 
+        // ── fsl-develop ─────────────────────────────────────────
+        // Narrow scope for the FSL generate/validate/deploy/test cycle
+        // (a subset of "develop", tagged separately so it can be
+        // requested on its own without pulling in SAP/flat-file/doc-type
+        // generation/debugging/testing tools that "develop" also covers).
+        "dsl_validate" | "fsl_deploy" | "fsl_extract" | "service_invoke" | "node_list"
+        | "node_get" | "node_delete" | "folder_create" | "package_create" | "package_list"
+        | "package_reload" | "package_info" => &["fsl-develop", "develop"],
+
         // ── develop ─────────────────────────────────────────────
-        "flow_service_create"
-        | "put_node"
-        | "service_invoke"
-        | "document_type_create"
-        | "mapset_value" => &["develop"],
+        "flow_service_create" | "put_node" | "document_type_create" | "mapset_value" => {
+            &["develop"]
+        }
         n if n.starts_with("flow_debug_") => &["develop"],
         n if n.starts_with("test_") || n.starts_with("mock_") => &["develop"],
         n if n.starts_with("doctype_gen_") || n.starts_with("sap_") => &["develop"],
         n if n.starts_with("ns_dep_") => &["develop"],
         n if n.starts_with("flatfile_") => &["develop"],
-        "node_list" | "node_get" | "node_delete" | "folder_create" => &["develop"],
         n if n.starts_with("package_") => &["develop", "deploy"],
 
         // ── adapters ────────────────────────────────────────────
