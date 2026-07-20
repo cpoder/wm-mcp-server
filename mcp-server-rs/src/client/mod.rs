@@ -8,6 +8,7 @@ mod alerts;
 mod auditing;
 mod enterprise_gw;
 mod flow_debug;
+mod flow_gen;
 mod global_vars;
 mod health;
 mod ip_access;

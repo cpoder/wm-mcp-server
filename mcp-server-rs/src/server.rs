@@ -272,6 +272,53 @@ impl WmServer {
         }
     }
 
+    // ── DSL / FSL Generation ────────────────────────────────────────────
+
+    #[tool(
+        description = "Validate DSL source text against its grammar without deploying anything. FSL is currently the only supported DSL. Returns status (SUCCESS/FAILED), validationErrors (list of syntax error messages), and errorCount."
+    )]
+    async fn dsl_validate(
+        &self,
+        Parameters(p): Parameters<DslValidateParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.dsl_validate(&p.dsl_text).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("dsl_validate failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Compile FSL source and deploy it as a flow service on IS in a single atomic call. The target package_name must already exist (use package_create first). Returns status (SUCCESS/FAILED), message, and the compiled node (informational only — do not repost it via put_node, this call already deploys the service)."
+    )]
+    async fn fsl_deploy(
+        &self,
+        Parameters(p): Parameters<FslDeployParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c
+            .fsl_deploy(&p.fsl_string, &p.package_name, &p.ifc_name, &p.flow_name)
+            .await
+        {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("fsl_deploy failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Decompile an existing flow service back into FSL source. Returns status (SUCCESS/FAILED), fslText, and on failure a message that may be a raw IS-side exception (e.g. for a nonexistent service). The regenerated FSL is semantically equivalent to the deployed service but not always textually identical to any FSL originally used to create it."
+    )]
+    async fn fsl_extract(
+        &self,
+        Parameters(p): Parameters<FslExtractParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.fsl_extract(&p.service_name).await {
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("fsl_extract failed: {e}")),
+        }
+    }
+
     // ── Document Type Management ───────────────────────────────────────
 
     #[tool(description = "Create a document type. Create parent folders first if needed.")]
