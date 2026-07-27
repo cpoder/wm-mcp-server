@@ -112,27 +112,25 @@ async fn run_http(
     // reached under a real hostname, so WM_ALLOWED_HOSTS opts those in. Entries
     // are added to the loopback defaults rather than replacing them, keeping
     // local health checks working.
-    let config = if allowed_hosts.iter().any(|h| h == "*") {
-        tracing::warn!(
-            "WM_ALLOWED_HOSTS=* -- Host validation disabled; the server is exposed to \
-             DNS rebinding attacks. Prefer listing explicit hostnames."
-        );
-        config.disable_allowed_hosts()
-    } else if allowed_hosts.is_empty() {
-        tracing::info!(
-            "Accepting loopback Hosts only ({:?}); set WM_ALLOWED_HOSTS to add hostnames",
-            config.allowed_hosts,
-        );
-        config
-    } else {
-        let hosts: Vec<String> = config
-            .allowed_hosts
-            .iter()
-            .cloned()
-            .chain(allowed_hosts)
-            .collect();
-        tracing::info!("Accepting Hosts: {:?}", hosts);
-        config.with_allowed_hosts(hosts)
+    let config = match config::resolve_allowed_hosts(&config.allowed_hosts, &allowed_hosts) {
+        None => {
+            tracing::warn!(
+                "WM_ALLOWED_HOSTS=* -- Host validation disabled; the server is exposed to \
+                 DNS rebinding attacks. Prefer listing explicit hostnames."
+            );
+            config.disable_allowed_hosts()
+        }
+        Some(hosts) => {
+            if allowed_hosts.is_empty() {
+                tracing::info!(
+                    "Accepting loopback Hosts only ({hosts:?}); \
+                     set WM_ALLOWED_HOSTS to add hostnames"
+                );
+            } else {
+                tracing::info!("Accepting Hosts: {hosts:?}");
+            }
+            config.with_allowed_hosts(hosts)
+        }
     };
 
     let service: StreamableHttpService<WmServer, LocalSessionManager> =
