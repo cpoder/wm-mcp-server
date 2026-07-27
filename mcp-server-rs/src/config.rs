@@ -41,6 +41,11 @@ pub struct AppConfig {
     /// Tool scopes to expose. Empty = all tools. Set via WM_SCOPES env var (comma-separated).
     /// Valid scopes: admin, develop, adapters, messaging, monitor, deploy, network, readonly
     pub scopes: Vec<String>,
+    /// Extra `Host` authorities accepted in HTTP mode, on top of the loopback
+    /// defaults. Set via WM_ALLOWED_HOSTS (comma-separated), e.g.
+    /// "mcp.example.com,mcp.example.com:8080". Empty = loopback only.
+    /// A single `*` disables Host validation entirely.
+    pub allowed_hosts: Vec<String>,
 }
 
 impl AppConfig {
@@ -79,11 +84,20 @@ impl AppConfig {
             instances: file.instances,
             default_instance,
             scopes: Self::load_scopes(),
+            allowed_hosts: Self::load_allowed_hosts(),
         })
     }
 
     fn load_scopes() -> Vec<String> {
-        std::env::var("WM_SCOPES")
+        Self::load_csv_env("WM_SCOPES")
+    }
+
+    fn load_allowed_hosts() -> Vec<String> {
+        Self::load_csv_env("WM_ALLOWED_HOSTS")
+    }
+
+    fn load_csv_env(var: &str) -> Vec<String> {
+        std::env::var(var)
             .ok()
             .map(|s| {
                 s.split(',')
@@ -113,6 +127,7 @@ impl AppConfig {
             instances,
             default_instance: name,
             scopes: Self::load_scopes(),
+            allowed_hosts: Self::load_allowed_hosts(),
         }
     }
 }

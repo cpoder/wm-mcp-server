@@ -47,7 +47,14 @@ async fn main() -> anyhow::Result<()> {
     }
 
     if let Some(port) = http_port {
-        run_http(clients, config.default_instance, config.scopes, port).await
+        run_http(
+            clients,
+            config.default_instance,
+            config.scopes,
+            config.allowed_hosts,
+            port,
+        )
+        .await
     } else {
         run_stdio(clients, config.default_instance, config.scopes).await
     }
@@ -76,6 +83,7 @@ async fn run_http(
     clients: HashMap<String, Arc<ISClient>>,
     default_instance: String,
     scopes: Vec<String>,
+    allowed_hosts: Vec<String>,
     port: u16,
 ) -> anyhow::Result<()> {
     use rmcp::transport::streamable_http_server::{
@@ -92,12 +100,39 @@ async fn run_http(
 
     let ct = CancellationToken::new();
 
-    let config = StreamableHttpServerConfig {
-        stateful_mode: true,
-        json_response: false,
-        sse_keep_alive: Some(std::time::Duration::from_secs(30)),
-        cancellation_token: ct.child_token(),
-        ..Default::default()
+    let config = StreamableHttpServerConfig::default()
+        .with_stateful_mode(true)
+        .with_json_response(false)
+        .with_sse_keep_alive(Some(std::time::Duration::from_secs(30)))
+        .with_cancellation_token(ct.child_token());
+
+    // The transport validates the inbound `Host` header to block DNS rebinding
+    // (RUSTSEC-2026-0189) and ships a loopback-only allowlist. That default is
+    // right for a local stdio-style deployment but rejects gateway deployments
+    // reached under a real hostname, so WM_ALLOWED_HOSTS opts those in. Entries
+    // are added to the loopback defaults rather than replacing them, keeping
+    // local health checks working.
+    let config = if allowed_hosts.iter().any(|h| h == "*") {
+        tracing::warn!(
+            "WM_ALLOWED_HOSTS=* -- Host validation disabled; the server is exposed to \
+             DNS rebinding attacks. Prefer listing explicit hostnames."
+        );
+        config.disable_allowed_hosts()
+    } else if allowed_hosts.is_empty() {
+        tracing::info!(
+            "Accepting loopback Hosts only ({:?}); set WM_ALLOWED_HOSTS to add hostnames",
+            config.allowed_hosts,
+        );
+        config
+    } else {
+        let hosts: Vec<String> = config
+            .allowed_hosts
+            .iter()
+            .cloned()
+            .chain(allowed_hosts)
+            .collect();
+        tracing::info!("Accepting Hosts: {:?}", hosts);
+        config.with_allowed_hosts(hosts)
     };
 
     let service: StreamableHttpService<WmServer, LocalSessionManager> =
