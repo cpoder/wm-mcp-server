@@ -68,6 +68,20 @@ impl WmServer {
     }
 }
 
+#[cfg(test)]
+impl WmServer {
+    /// Names of every tool the router registers. Lets the scope invariants in
+    /// [`crate::scopes`] run against the real tool set instead of a hand-kept
+    /// list; the generated `tool_router()` is private to this module.
+    pub(crate) fn registered_tool_names() -> Vec<String> {
+        Self::tool_router()
+            .list_all()
+            .into_iter()
+            .map(|t| t.name.to_string())
+            .collect()
+    }
+}
+
 #[tool_router]
 impl WmServer {
     pub fn new(clients: HashMap<String, Arc<ISClient>>, default_instance: String) -> Self {

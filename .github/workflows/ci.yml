@@ -31,7 +31,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: mcp-server-rs
-      - run: cargo clippy --manifest-path mcp-server-rs/Cargo.toml -- -D warnings
+      # --all-targets so test code is linted too, not just the binary.
+      - run: cargo clippy --manifest-path mcp-server-rs/Cargo.toml --all-targets -- -D warnings
 
   build:
     name: Build & Test
