@@ -43,7 +43,7 @@ pub const RESOURCES: &[DocResource] = &[
     DocResource {
         uri: "wm://docs/onprem-provisioning",
         name: "On-Prem Provisioning, Database & JDBC Setup",
-        description: "How to install add-on products (Trading Networks, EDIINT/AS2, EDI) with the IBM Installer in CLI mode, apply fixes with Update Manager (SUM), create database components with the Database Configurator (DCC) for PostgreSQL, and wire JDBC pools + functional aliases. Captures non-obvious gotchas: the PTY-required installer password prompt, the updateFunctionalAlias isolationlevel requirement, and the IS-restart-required rule for Trading Networks.",
+        description: "How to install add-on products (Trading Networks, EDIINT/AS2, EDI) with the IBM Installer in CLI mode, apply fixes with Update Manager (SUM), create database components with the Database Configurator (DCC) for PostgreSQL, and wire JDBC pools + functional aliases. Captures non-obvious gotchas: the PTY-required installer password prompt, the updateFunctionalAlias isolationlevel requirement, the IS-restart-required rule for Trading Networks, and the RESOLVED root cause of TN's empty-BasisSQLException datastore failure (statement caching disabled on the TN functional alias).",
         content: ONPREM_PROVISIONING_REF,
     },
 ];
@@ -142,44 +142,54 @@ Server restart inits TN cleanly against the DB. (A harmless UM
 "Realm is currently not reachable" error at startup is fine -- AS2/TN use HTTP,
 not Universal Messaging.)
 
-## Known issue: TN datastore init fails on PostgreSQL ("could not retrieve data")
+## RESOLVED bug: TN datastore init throws an EMPTY BasisSQLException
 
-Symptom: WmTN loads cleanly (hundreds of services, 0 load errors) but at startup TN
-logs `DatastoreException: Trading Networks could not retrieve data from your database`
-then `NullPointerException ... ehcache CacheManager ... is null`, and TN is disabled.
-The thrown `com.wm.util.BasisSQLException` has an EMPTY message.
+Symptom: WmTN loads cleanly (945 services, 0 load errors) but at startup TN logs
+`DatastoreException: Trading Networks could not retrieve data from your database`;
+the chained `com.wm.util.BasisSQLException` has an EMPTY message and TN is left
+disabled (a downstream `NullPointerException ... ehcache CacheManager ... is null`
+follows). DataDirect spy logging shows the connection + all JDBC metadata calls
+SUCCEED, then the throw happens BEFORE any prepareStatement/executeQuery -- no SQL
+reaches the driver and nothing appears in the PostgreSQL log.
 
-Diagnosis (traced with DataDirect spy logging -- set `spyenabled=true` in
-config/jdbc/pool/<pool>.xml, restart, read logs/spy/<pool>.log): TN's
-`Datastore.getDBMetaData()` opens the connection and the JDBC metadata calls all
-SUCCEED (`getMetaData`/`getDatabaseProductName` -> "PostgreSQL", driver 6.0.0, DB
-16.14), but the method throws the empty SQLException BEFORE issuing any SQL -- there
-is NO prepareStatement/executeQuery in the spy trace and NO error in the PostgreSQL
-server log. The throw originates inside TN's `SQLStatements.getSql("version.select")`.
+ROOT CAUSE: the TN JDBC *functional alias* had statement caching DISABLED. TN
+prepares all of its SQL through the pool's cached-statement path, and the IS
+connection wrapper refuses that path outright when the alias has caching turned
+off: it raises `BAJ.0001.0002` BEFORE preparing any statement. That is why no SQL
+ever reaches the driver and the PostgreSQL log stays clean. The error renders with
+an EMPTY message in this state, and TN's generic "could not retrieve data" wrapper
+hides what is left of it.
 
-Ruled out (don't waste time re-checking):
-- DB schema: DCC `-pr TN/IS/MWS` completes; 203 tables incl. bizdoc, is_datastore.
-- Connectivity: `jdbc_pool_test` and the admin "Test" both succeed.
-- PostgreSQL version: fails identically on PG16 and PG17 (the DataDirect "This driver
-  is locked for use with embedded applications" message only appears for
-  EXTERNAL/standalone use of the OEM driver -- expected, NOT the IS-side cause).
-- The TNModelVersion row: `version.select` reads it, but inserting it
-  (`INSERT INTO TNModelVersion(MajorVersion,MinorVersion) VALUES (85,0)`) does NOT fix
-  startup -- TN throws UPSTREAM of that query. DCC never populates this row (no SQL
-  script inserts it; TN writes it itself via `Datastore.setVersion`, only during a
-  config import).
-- Jar conflicts: the two tncore.jar (install-level + instance-level) are
-  byte-identical and both define the `version.select` key.
-- Package load: WmTN itself loads with 0 errors.
+KEY: this is DB-INDEPENDENT. `cache` is a property of the *alias*, not the database --
+so pointing TN at the embedded Derby pool gives the IDENTICAL empty error. Do NOT
+chase PostgreSQL / DataDirect / schema / `TNModelVersion`; they are all fine. (The
+DataDirect "driver is locked for use with embedded applications" error only shows if
+you test the OEM driver from a STANDALONE app; inside IS it is licensed.)
 
-Separately, WmEDIforTN and WmEDI may fail to load ("circular dependencies" / "system
-package depends on non-system package") when older EDI/EDIINT module versions are
-added to a 12.1 install -- a different problem affecting EDI-over-TN, not the core
-TN datastore.
+FIX: enable statement caching on the TN functional alias.
+- On disk: `config/jdbc/function/TN.xml` -> `<value name="cache">true</value>`
+  (also ensure `connPoolAlias` points at your real DB pool, not "Embedded Database
+  Pool"). Edit while IS is STOPPED, then start: the alias is read once at TN init, so
+  editing the file while running is NOT picked up and `package_reload WmTN` is not
+  enough -- a full IS restart is required.
+- `wm.server.jdbcpool:updateFunctionalAlias` does NOT expose the cache flag, so set it
+  on disk (or via the Admin UI functional-alias edit page) and verify before restart.
+Result: TN logs "Loading system configuration" with NO DatastoreException and the
+`wm.tn.*` startup services run.
 
-Status: unresolved/environment-specific. Next steps: open an IBM support case with the
-spy trace, or point the TN functional alias at the embedded (Derby) datastore to
-isolate whether the defect is DataDirect/PostgreSQL-specific.
+Separate gotcha 1 -- iLive on an on-prem box: if `WmIntegrationLiveServer` is ENABLED,
+`ILiveUtil.inILive()` returns true and the IS JDBC wrapper attempts a tenant-based
+`setCatalog`, spamming `ISS.0004.9998E "Unable to assign the specified catalog to the
+connection. Please check the tenant id null"`. Harmless to TN but noisy: disable
+`WmIntegrationLiveServer` (+ `WmIntegrationLiveGit`, which depends on it) and restart
+(`Server.inILive()` caches per-JVM, so a restart is required; a runtime disable of
+WmIntegrationLiveServer is rejected while WmIntegrationLiveGit is still enabled).
+
+Separate gotcha 2 -- WmEDIforTN/WmEDI won't load ("system package depends on non-system
+package"): they require `WmFlatFile` (+ WmEDI/WmTN). If WmFlatFile is not installed,
+both stay unloaded. AS2 itself (`WmEDIINT`, requires only WmTN) and TN work fine
+without them; full EDI document recognition (X12/EDIFACT parsing) needs WmFlatFile
+installed via the IBM Installer.
 "#;
 
 pub fn list() -> Vec<Resource> {
