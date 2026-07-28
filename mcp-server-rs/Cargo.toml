@@ -13,7 +13,9 @@ name = "wm-mcp-server"
 path = "src/main.rs"
 
 [dependencies]
-rmcp = { version = "1.2", features = ["server", "transport-io", "transport-streamable-http-server", "macros"] }
+# >=1.4 required: patches RUSTSEC-2026-0189 (DNS rebinding in the Streamable
+# HTTP server transport) and provides the Host-allowlist builder API.
+rmcp = { version = "1.8", features = ["server", "transport-io", "transport-streamable-http-server", "macros"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "io-std", "net", "signal"] }
 axum = "0.8"
 tokio-util = { version = "0.7", features = ["rt"] }

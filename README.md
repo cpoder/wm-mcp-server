@@ -204,6 +204,20 @@ Flow services are created via `wm.server.ns/putNode` which accepts the full flow
 - **stdio** (default): Standard MCP stdio transport, works with all MCP clients
 - **HTTP**: `wm-mcp-server --http 8080` starts a Streamable HTTP server at `/mcp` for MCP gateways
 
+### Allowed hosts (HTTP mode)
+
+To block DNS rebinding attacks, the HTTP transport validates the inbound `Host`
+header and accepts **loopback only** (`localhost`, `127.0.0.1`, `::1`) by
+default. Requests carrying any other `Host` get `403`.
+
+If the server is reached under a real hostname, list it in `WM_ALLOWED_HOSTS`
+(comma-separated). Entries are *added* to the loopback defaults:
+
+```bash
+WM_ALLOWED_HOSTS=mcp.example.com,mcp.example.com:8080
+WM_ALLOWED_HOSTS='*'   # disables Host validation entirely -- not recommended
+```
+
 ### Tool scoping
 
 Set `WM_SCOPES` to restrict which tools are exposed (useful for MCP gateways):

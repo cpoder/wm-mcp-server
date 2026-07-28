@@ -128,3 +128,128 @@ fn is_readonly_tool(name: &str) -> bool {
         || name.ends_with("_categories")
         || name.ends_with("_registries")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::server::WmServer;
+
+    /// Scopes an operator may put in WM_SCOPES. Keep in sync with the README
+    /// ("Available scopes") and the doc comment on `AppConfig::scopes`.
+    const DOCUMENTED_SCOPES: &[&str] = &[
+        "admin",
+        "develop",
+        "deploy",
+        "adapters",
+        "messaging",
+        "monitor",
+        "network",
+        "readonly",
+    ];
+
+    /// Every tool the server actually registers, read from the live router so
+    /// tools added later are covered without touching these tests.
+    fn registered_tools() -> Vec<String> {
+        WmServer::registered_tool_names()
+    }
+
+    #[test]
+    fn router_exposes_tools() {
+        // Guards the tests below against silently passing on an empty list.
+        assert!(registered_tools().len() > 300);
+    }
+
+    #[test]
+    fn every_package_tool_stays_in_the_deploy_scope() {
+        // Package management is what the "deploy" scope exists for. A new match
+        // arm listing individual package_* tools ahead of the generic one drops
+        // them out of "deploy" silently -- nothing fails at startup.
+        for tool in registered_tools() {
+            if let Some(rest) = tool.strip_prefix("package_") {
+                let scopes = tool_scope(&tool);
+                assert!(
+                    scopes.contains(&"deploy"),
+                    "{tool} lost the \"deploy\" scope (got {scopes:?}); \
+                     a package_* tool must stay reachable for deployment \
+                     (offending suffix: {rest})"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn every_registered_tool_has_at_least_one_scope() {
+        for tool in registered_tools() {
+            assert!(
+                !tool_scope(&tool).is_empty(),
+                "{tool} maps to no scope, so WM_SCOPES can never expose it"
+            );
+        }
+    }
+
+    #[test]
+    fn every_scope_in_use_is_documented() {
+        for tool in registered_tools() {
+            for scope in tool_scope(&tool) {
+                assert!(
+                    DOCUMENTED_SCOPES.contains(scope),
+                    "{tool} uses undocumented scope {scope:?}; add it to the \
+                     README scope list, the AppConfig::scopes doc comment and \
+                     DOCUMENTED_SCOPES"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn admin_tools_never_leak_into_the_develop_scope() {
+        for tool in registered_tools() {
+            let scopes = tool_scope(&tool);
+            if scopes.contains(&"admin") {
+                assert!(
+                    !scopes.contains(&"develop"),
+                    "{tool} is admin-scoped but also reachable from \"develop\""
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn unset_scopes_expose_every_tool() {
+        for tool in registered_tools() {
+            assert!(is_tool_allowed(&tool, &[]), "{tool} hidden with no filter");
+        }
+    }
+
+    #[test]
+    fn readonly_scope_hides_mutating_tools() {
+        let readonly = vec!["readonly".to_string()];
+        for tool in [
+            "put_node",
+            "node_delete",
+            "package_delete",
+            "user_add",
+            "is_shutdown",
+            "jdbc_pool_delete",
+        ] {
+            assert!(
+                !is_tool_allowed(tool, &readonly),
+                "{tool} mutates state but is exposed under the readonly scope"
+            );
+        }
+        for tool in ["node_list", "node_get", "package_info", "server_stats"] {
+            assert!(
+                is_tool_allowed(tool, &readonly),
+                "{tool} only reads state but is hidden under the readonly scope"
+            );
+        }
+    }
+
+    #[test]
+    fn a_scope_only_matches_its_own_tools() {
+        assert!(is_tool_allowed("put_node", &["develop".to_string()]));
+        assert!(!is_tool_allowed("put_node", &["monitor".to_string()]));
+        assert!(is_tool_allowed("user_add", &["admin".to_string()]));
+        assert!(!is_tool_allowed("user_add", &["develop".to_string()]));
+    }
+}
