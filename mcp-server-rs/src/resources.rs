@@ -46,6 +46,12 @@ pub const RESOURCES: &[DocResource] = &[
         description: "How to install add-on products (Trading Networks, EDIINT/AS2, EDI) with the IBM Installer in CLI mode, apply fixes with Update Manager (SUM), create database components with the Database Configurator (DCC) for PostgreSQL, and wire JDBC pools + functional aliases. Captures non-obvious gotchas: the PTY-required installer password prompt, the updateFunctionalAlias isolationlevel requirement, and the IS-restart-required rule for Trading Networks.",
         content: ONPREM_PROVISIONING_REF,
     },
+    DocResource {
+        uri: "wm://docs/fsl-language-reference",
+        name: "FSL (Flow Service Language) Reference",
+        description: "Text-based DSL syntax for authoring flow services with dsl_validate/fsl_deploy/fsl_extract: interface/service/properties structure, copy vs set, reserved-keyword backtick escaping, semicolon placement rules, EXIT/TRY-CATCH, and a complete worked example.",
+        content: FSL_LANGUAGE_REF,
+    },
 ];
 
 const ONPREM_PROVISIONING_REF: &str = r#"# On-Prem Provisioning, Database & JDBC Configuration
@@ -2342,4 +2348,233 @@ webMethods supports publish-and-subscribe, request/reply, and publish-and-wait p
 - **Internal:** Built into IS for flow services and workflows
 - **Universal Messaging:** Self-hosted webMethods messaging broker
 - **External:** JMS connectors for IBM MQ, Apache Kafka, etc.
+"#;
+
+const FSL_LANGUAGE_REF: &str = r#"# FSL (Flow Service Language) Reference
+
+FSL is a text-based DSL for authoring flow services, used with the
+`dsl_validate` / `fsl_deploy` / `fsl_extract` tools as an alternative to
+building a service field-by-field via `put_node`. Prefer FSL for anything
+beyond a trivial one-step service -- it is far less error-prone than hand
+building a putNode tree, and `dsl_validate` lets you catch syntax errors
+before touching the server.
+
+## Workflow
+
+1. `package_create` the target package if it doesn't already exist (or
+   confirm with `package_list` / `package_info`) -- `fsl_deploy` does NOT
+   create the package for you.
+2. Write FSL source text (see structure below).
+3. `dsl_validate` it -- returns `status` (SUCCESS/FAILED), `validationErrors`,
+   `errorCount`. Iterate until clean; this is a pure syntax check, no server
+   mutation.
+4. `fsl_deploy` it with `package_name`, `ifc_name` (folder path), and
+   `flow_name`. This compiles AND deploys in one atomic call -- there is no
+   separate "create shell then fill it" step like `put_node` requires. The
+   compiled node returned in the response is informational only; do not
+   repost it via `put_node`.
+5. Verify with `node_get` and a `service_invoke` test call. `fsl_extract` can
+   decompile an existing service back to FSL (useful to see the canonical
+   form of something built via `put_node`, or to diff after a redeploy) --
+   the round-tripped FSL is semantically equivalent but not always textually
+   identical to the original source.
+
+Deploying a `.flow` via `fsl_deploy` does NOT deploy any IS Unit Test suite
+associated with it -- test suite files are a separate, filesystem-level
+concern outside what this HTTP-only tool surface can reach.
+
+## File Structure
+
+Every FSL file starts with an interface declaration (folder path ONLY, never
+the package name -- the package goes in `fsl_deploy`'s `package_name` param,
+not in the source text), followed by the service declaration and body.
+
+```fsl
+interface orders.receive
+
+service processOrder (
+    input {
+        String customerId;
+        Double[] priceList;
+    }
+    output {
+        String status;
+    }
+)
+properties {
+    comment: "Validates and totals an incoming order.";
+    visible: private;
+}
+{
+    MAP {
+        mapTarget {
+            String status;
+        }
+        set status = "PENDING";
+    }
+}
+```
+
+- No semicolon after the `interface` line.
+- `service` declares the name ONLY -- no package, no folder path.
+- The `properties { ... }` block (comment, visible, prefetch, validateInput,
+  validateOutput, ...) goes AFTER the signature and BEFORE the body's `{`.
+  Every property line inside `properties { }` ends with `;`.
+- The body is the last top-level `{ ... }` block, containing the actual steps
+  (INVOKE, MAP, BRANCH, LOOP, IF, TRY, EXIT, ...).
+- No markdown fences, no conversational text -- FSL is raw plain text.
+
+## copy vs set (do not confuse these)
+
+- **`copy source -> target;`** -- moves a value already in the pipeline.
+- **`set target = "literal";`** -- assigns a hardcoded literal.
+- Never `<-`. Never `set "value" -> target;`. Never bare `target = "value";`
+  without `set`. Never `set` and `copy` the same target in the same block --
+  IS runs statements in order, so whichever runs second silently wins and the
+  other becomes dead code.
+- Record/recordList literals are whole-block JSON, never partial slash paths:
+  `set items = [{"sku": "A1", "qty": "1"}];` -- NOT
+  `set items/sku = "A1";` for an initial assignment.
+
+## Reserved keywords need backticks
+
+If a pipeline variable or schema field name collides with an FSL keyword, it
+must be backtick-escaped wherever it's declared or referenced as an
+identifier: `pattern`, `value`, `properties`, `type`, `service`, `interface`,
+`input`, `output`, `record`, `recordList`, `document`, `branch`, `sequence`,
+`loop`, `map`, `mapSource`, `mapTarget`, `copy`, `set`, `drop`.
+
+This shows up constantly on `pub.math:*`/`pub.string:*` output mappings,
+whose return parameter is literally named `value`:
+
+```fsl
+INVOKE pub.math:addInts {
+    input {
+        mapSource {
+            String a;
+            String b;
+        }
+        mapTarget {
+            String num1;
+            String num2;
+        }
+        copy a -> num1;
+        copy b -> num2;
+    }
+    output {
+        mapSource {
+            String `value`;
+        }
+        mapTarget {
+            String sum;
+        }
+        copy `value` -> sum;
+    }
+}
+```
+
+Only the reserved leaf name gets backticks -- non-reserved parent path
+segments stay unescaped.
+
+## Semicolon placement (the #1 source of parser errors)
+
+- **Statements get a semicolon:** every `set`/`copy`/`drop`, every field
+  declaration (`String x;`), every property line inside a signature field's
+  `{ }` block or a `properties { }` block.
+- **Step-level properties do NOT get a semicolon:** `comment:`,
+  `validateInput:`, `invoke-order:`, `switch:`, `inputArray:` etc. when they
+  appear as the first lines inside a flow step block (MAP, INVOKE, BRANCH,
+  LOOP, ...). `MAP { comment: "x" }` -- correct. `MAP { comment: "x"; }` --
+  parser error.
+- **Closing braces never get a semicolon**, for ANY block: MAP, INVOKE,
+  SEQUENCE, BRANCH, IF/ELSEIF/ELSE, LOOP, WHILE, REPEAT, DO/UNTIL, TRY/CATCH/
+  FINALLY, EXIT, TRANSFORM. `SEQUENCE { ... };` is always wrong.
+- `BREAK` and `CONTINUE` are standalone -- no trailing semicolon:
+  `IF (%y% >= 15) { BREAK }`, not `{ BREAK; }`.
+- No single-line multi-statement blocks. One declaration/statement/brace per
+  line, nested structures indented -- this isn't just style, dense one-liners
+  are a common source of "extraneous input" parse errors.
+
+## Property ordering inside a step
+
+Inside any step block, properties must appear before nested steps, in this
+order: general (`comment`, `scope`, `timeout`, `label`) first, then
+block-specific (`exitOn` for SEQUENCE/TRY/CATCH/FINALLY, `switch`/
+`evaluateLabels` for BRANCH, `inputArray` for LOOP, `count`/`repeatInterval`/
+`repeatOn` for REPEAT), then child steps (MAP, INVOKE, IF, ...). Putting a
+child step before a property causes an "extraneous input" error.
+
+## EXIT and TRY/CATCH (failure paths)
+
+`EXIT` immediately halts the flow with a signal. `exitFrom: "$flow"` +
+`signal: "FAILURE"` is how a service deliberately fails with a message an
+IS Unit Test suite can assert against (see the FSL example test-suite note
+below):
+
+```fsl
+IF (%amount% < 0) {
+    comment: "Business rule: amount must be non-negative"
+    EXIT {
+        exitFrom: "$flow"
+        signal: "FAILURE"
+        failureMessage: "Amount must be greater than or equal to zero"
+    }
+}
+```
+
+A test case in an IS Unit Test suite that expects this EXIT to fire must use
+`<expected><exception class="com.wm.app.b2b.client.ServiceException"
+message="Amount must be greater than or equal to zero"/></expected>` in its
+`webMethodsTestCase` -- not a `<file>` IData comparison, which only applies
+to normal successful output.
+
+`TRY`/`CATCH` are adjacent sibling blocks (not nested), matching putNode's
+model: put the risky steps in `TRY { }`, recovery/rethrow logic in
+`CATCH { }` immediately after. To propagate the failure out of the current
+scope from inside CATCH, use `EXIT { exitFrom: "$parent" signal: "FAILURE" }`.
+
+```fsl
+TRY {
+    INVOKE risky:operation {}
+}
+CATCH {
+    EXIT {
+        exitFrom: "$parent"
+        signal: "FAILURE"
+        failureMessage: "risky:operation failed"
+    }
+}
+```
+
+## INVOKE vs MAP+TRANSFORM
+
+- Standalone service call, nothing else happening in that step -> `INVOKE
+  service:name { input { ... } output { ... } }` at the top level.
+- Service call bundled with other pipeline work (extra `set`/`copy`/`drop` in
+  the same logical step) -> wrap it as `MAP { TRANSFORM service:name { ... } }`.
+  Inside an active `MAP` block, `INVOKE` is never valid -- only `TRANSFORM` is.
+- A `MAP` block is either pure direct assignments (`mapSource`/`mapTarget` +
+  `set`/`copy` at the MAP's own root, no nested TRANSFORM) OR a pure
+  TRANSFORM wrapper (MAP has no root-level `mapSource`/`mapTarget`, all
+  mapping lives inside the child TRANSFORM's `input`/`output`). Never mix
+  both patterns in the same MAP.
+
+## System variables
+
+`$retries` (REPEAT), `$iterationCount` (DO/WHILE/LOOP), `$null`, `$flow`,
+`$default` are implicitly available in their respective contexts. Never
+declare them in `mapSource`/`mapTarget` -- just reference them directly, e.g.
+`copy repeatVals[$retries] -> target;`.
+
+## Type preservation with catalog services
+
+When mapping into an `INVOKE`/`TRANSFORM` target, the CALLED SERVICE's
+declared parameter type always wins over the pipeline source variable's
+type -- both `mapTarget` and the calling service's own signature must match
+it end-to-end, or the parameter silently arrives as null and the service
+throws "Missing Parameter" at runtime. E.g. `pub.math:addInts` takes String
+`num1`/`num2` even though it's adding numbers -- an `Integer` pipeline
+variable must still be declared `String` in `mapTarget`. Only fall back to
+matching the source variable's own type when the target service imposes no
+type constraint.
 "#;
