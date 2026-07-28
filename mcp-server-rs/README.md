@@ -34,7 +34,7 @@ Set `WM_CONFIG=/path/to/config.json`:
 }
 ```
 
-## Tools Reference (336 tools)
+## Tools Reference (339 tools)
 
 ### Server & Instances (3)
 `list_instances`, `is_status`, `is_shutdown`
@@ -44,6 +44,9 @@ Set `WM_CONFIG=/path/to/config.json`:
 
 ### Flow Services (5)
 `flow_service_create`, `put_node`, `service_invoke`, `document_type_create`, `mapset_value`
+
+### FSL Generation (3)
+`dsl_validate`, `fsl_deploy`, `fsl_extract`
 
 ### Flow Debugging (7)
 `flow_debug_start`, `flow_debug_execute` (stepOver/stepIn/stepOut/resume/stop), `flow_debug_close`, `flow_debug_insert_breakpoints`, `flow_debug_remove_all_breakpoints`, `flow_debug_set_pipeline`, `flow_debug_stop_service`

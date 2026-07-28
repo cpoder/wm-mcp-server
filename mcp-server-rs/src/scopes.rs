@@ -32,8 +32,10 @@ pub fn tool_scope(name: &str) -> &'static [&'static str] {
         // requested on its own without pulling in SAP/flat-file/doc-type
         // generation/debugging/testing tools that "develop" also covers).
         "dsl_validate" | "fsl_deploy" | "fsl_extract" | "service_invoke" | "node_list"
-        | "node_get" | "node_delete" | "folder_create" | "package_create" | "package_list"
-        | "package_reload" | "package_info" => &["fsl-develop", "develop"],
+        | "node_get" | "node_delete" | "folder_create" => &["fsl-develop", "develop"],
+        "package_create" | "package_list" | "package_reload" | "package_info" => {
+            &["fsl-develop", "develop", "deploy"]
+        }
 
         // ── develop ─────────────────────────────────────────────
         "flow_service_create" | "put_node" | "document_type_create" | "mapset_value" => {
@@ -121,6 +123,8 @@ fn is_readonly_tool(name: &str) -> bool {
         || name == "node_list"
         || name == "node_get"
         || name == "service_invoke"
+        || name == "dsl_validate"
+        || name == "fsl_extract"
         || name.ends_with("_categories")
         || name.ends_with("_registries")
 }

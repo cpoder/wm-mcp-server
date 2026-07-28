@@ -39,7 +39,7 @@ pub struct AppConfig {
     pub instances: HashMap<String, InstanceConfig>,
     pub default_instance: String,
     /// Tool scopes to expose. Empty = all tools. Set via WM_SCOPES env var (comma-separated).
-    /// Valid scopes: admin, develop, adapters, messaging, monitor, deploy, network, readonly
+    /// Valid scopes: admin, develop, fsl-develop, adapters, messaging, monitor, deploy, network, readonly
     pub scopes: Vec<String>,
 }
 

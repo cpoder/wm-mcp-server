@@ -15,6 +15,7 @@ Compatible with any MCP client: [IBM Bob](https://www.ibm.com/products/bob), [Cl
 | Area | What the AI can do | Tools |
 |---|---|---|
 | **Flow services** | Create services with full logic (INVOKE, MAP, BRANCH, LOOP, TRY/CATCH), signatures, test them | 5 |
+| **FSL generation** | Validate, compile/deploy, and decompile flow services from Flow Service Language (FSL) source text | 3 |
 | **Flow debugging** | Step-by-step execution, inspect pipeline at each step, set breakpoints, modify variables | 7 |
 | **Unit testing** | Run test suites, get JUnit/text reports, mock services for isolated testing | 10 |
 | **Namespace dependencies** | Find dependents, references, unresolved refs, search nodes, refactor/rename | 6 |
@@ -56,7 +57,7 @@ Compatible with any MCP client: [IBM Bob](https://www.ibm.com/products/bob), [Cl
 | **IP access** | Global IP allow/deny rules | 4 |
 | **WebSocket** | Session management, endpoint creation, broadcast | 4 |
 
-**336 tools + 9 interactive prompts + 5 RAG resources** in total. **184 end-to-end tests** validated against a live IS with real infrastructure (Mosquitto MQTT broker, ActiveMQ JMS, MySQL).
+**339 tools + 9 interactive prompts + 5 RAG resources** in total. **184 end-to-end tests** validated against a live IS with real infrastructure (Mosquitto MQTT broker, ActiveMQ JMS, MySQL).
 
 ### Interactive setup wizards (prompts)
 
@@ -210,9 +211,12 @@ Set `WM_SCOPES` to restrict which tools are exposed (useful for MCP gateways):
 ```bash
 WM_SCOPES=develop,monitor  # Only development and monitoring tools
 WM_SCOPES=readonly          # Only read-only tools (list, get, status)
+WM_SCOPES=fsl-develop       # Only the FSL generate/validate/deploy/test cycle
 ```
 
-Available scopes: `admin`, `develop`, `deploy`, `adapters`, `messaging`, `monitor`, `network`, `readonly`.
+Available scopes: `admin`, `develop`, `fsl-develop`, `deploy`, `adapters`, `messaging`, `monitor`, `network`, `readonly`.
+
+`fsl-develop` is a narrow subset of `develop` scoped to the FSL workflow (`dsl_validate`, `fsl_deploy`, `fsl_extract`, `service_invoke`, `node_list`, `node_get`, `node_delete`, `folder_create`, `package_create`, `package_list`, `package_reload`, `package_info`) — use it to expose FSL generation without pulling in SAP, flat-file, doc-type generation, debugging, or unit-testing tools that `develop` also covers.
 
 ## Requirements
 

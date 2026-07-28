@@ -1,6 +1,6 @@
 # wm-mcp-server
 
-MCP server for [webMethods Integration Server](https://www.ibm.com/docs/en/webmethods-integration/wm-integration-server/11.1.0) — 336 tools replacing Designer for development and administration.
+MCP server for [webMethods Integration Server](https://www.ibm.com/docs/en/webmethods-integration/wm-integration-server/11.1.0) — 339 tools replacing Designer for development and administration.
 
 ## Quick Start
 
