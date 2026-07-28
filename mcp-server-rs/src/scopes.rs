@@ -139,6 +139,7 @@ mod tests {
     const DOCUMENTED_SCOPES: &[&str] = &[
         "admin",
         "develop",
+        "fsl-develop",
         "deploy",
         "adapters",
         "messaging",
