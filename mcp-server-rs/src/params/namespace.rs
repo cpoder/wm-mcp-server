@@ -25,7 +25,9 @@ pub struct NodeNameParam {
 pub struct FolderCreateParam {
     #[schemars(description = "Package name")]
     pub package: String,
-    #[schemars(description = "Dot-separated path (e.g., \"services\" or \"services.utils\")")]
+    #[schemars(
+        description = "Dot-separated folder path, WITHOUT the package name. The root folder of a package is the package name in lowercase, and everything nests under it: \"petstoreapi\", then \"petstoreapi.api\", then \"petstoreapi.api.pets\". Create each level with its own call -- parents are not created implicitly."
+    )]
     pub folder_path: String,
     #[schemars(description = "Target IS instance name (omit for default)")]
     pub instance: Option<String>,

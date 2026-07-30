@@ -23,6 +23,12 @@ pub const RESOURCES: &[DocResource] = &[
         content: PUTNODE_EXAMPLES,
     },
     DocResource {
+        uri: "wm://docs/adapter-connection-reference",
+        name: "Adapter Connection Configuration Reference",
+        description: "How to create an adapter connection (JDBC and others) with adapter_connection_create: discovering the real adapter type name and the connectionSettings systemNames, a verified PostgreSQL/SQL Server/Oracle example, the connection-alias namespace rule, enabling the node, and an error-to-cause table.",
+        content: ADAPTER_CONNECTION_REF,
+    },
+    DocResource {
         uri: "wm://docs/adapter-service-reference",
         name: "Adapter Service Configuration Reference",
         description: "How to create JDBC adapter services with full table/column configuration. Select, Insert, CustomSQL examples with correct adapter_service_settings JSON.",
@@ -219,10 +225,39 @@ A service is named by its **folder path**: `folder.subfolder:serviceName`. This 
 NEVER prefix `node_nsName` with the package name -- the package is passed separately in `node_pkg`.
 Folders and packages are different concepts: a node lives *in* a package but is *named* by its folder path.
 
-- Correct:     `node_nsName = "orders.api:create"`, `node_pkg = "MyPackage"`
+- Correct:     `node_nsName = "mypackage.orders.api:create"`, `node_pkg = "MyPackage"`
 - WRONG (500): `node_nsName = "MyPackage.orders.api:create"` (or `"MyPackage:orders.api:create"`)
 
+Why the second form fails: every segment of the path is a **folder that must already exist**.
+`MyPackage` (PascalCase) is a package, not a folder, so putNode reports
+`[ISS.0081.9001] Node MyPackage.orders.api:create does not exist`. The first form works because
+`mypackage` is a real folder you created with `folder_create` -- see the namespace layout below.
+
 The same applies to `folder_create`, `document_type_create` and `node_delete`: the path never contains the package name.
+
+## Namespace layout (create the folders before anything else)
+
+The IS namespace is **shared by all packages** -- a folder path identifies a node globally, and
+the package only says who owns it. So a package must not plant generic folders at the top level:
+two packages both defining `api` or `util` end up interleaved in the same namespace.
+
+Convention: **one root folder per package, the package name in lowercase, everything nested under it.**
+
+```
+package PetstoreAPI          package WxEdiAddon
+  petstoreapi                  wx.edi.addon
+    petstoreapi.api              wx.edi.addon.inbound
+    petstoreapi.adapter          wx.edi.addon.outbound
+    petstoreapi.connections      wx.edi.addon.connections
+```
+
+- Right: `folder_create("PetstoreAPI", "petstoreapi")` then `folder_create("PetstoreAPI", "petstoreapi.api")`
+- Wrong: `folder_create("PetstoreAPI", "api")` -- top-level generic folder, collides across packages
+
+A multi-word package name is split into dotted lowercase segments (`WxEdiAddon` -> `wx.edi.addon`),
+which also groups every package sharing a prefix under one visible tree.
+
+`folder_create` does NOT create intermediate folders: call it once per level, parents first.
 
 ## WmPath Format
 
@@ -244,8 +279,8 @@ All field references in flow services use WmPath format: `/fieldName;type;dim[;d
 - `/myList;1;1` -- string array
 - `/myDoc;2;0` -- anonymous record (scalar)
 - `/myDocs;2;1` -- anonymous record array
-- `/accounts;4;1;mypkg.doctypes:account` -- typed record array (RecordRef to doc type)
-- `/accounts;4;0;mypkg.doctypes:account/customerName;1;0` -- field inside current LOOP iteration element
+- `/accounts;4;1;mypackage.doctypes:account` -- typed record array (RecordRef to doc type)
+- `/accounts;4;0;mypackage.doctypes:account/customerName;1;0` -- field inside current LOOP iteration element
 
 ## Flow Step Types
 
@@ -294,7 +329,7 @@ Use type 4 (RecordRef) and `<array>` element in data:
 ```json
 {
   "type": "MAPSET",
-  "field": "/accounts;4;1;mypkg.doctypes:account",
+  "field": "/accounts;4;1;mypackage.doctypes:account",
   "overwrite": "true",
   "d_enc": "XMLValues",
   "mapseti18n": "true",
@@ -566,7 +601,7 @@ Every service needs input/output signatures:
   "field_type": "recref",
   "field_dim": "1",
   "nillable": "true",
-  "rec_ref": "mypkg.doctypes:account",
+  "rec_ref": "mypackage.doctypes:account",
   "rec_closed": "true"
 }
 ```
@@ -576,7 +611,7 @@ Every service needs input/output signatures:
 Before using RecordRef fields, create the document type:
 ```json
 {
-  "node_nsName": "mypkg.doctypes:account",
+  "node_nsName": "mypackage.doctypes:account",
   "node_pkg": "MyPackage",
   "node_type": "record",
   "field_type": "record",
@@ -688,7 +723,7 @@ All examples below have been tested and verified on IS 11.1.
 
 ```json
 {
-  "node_nsName": "mypkg.services:greet",
+  "node_nsName": "mypackage.services:greet",
   "node_pkg": "MyPackage",
   "node_type": "service",
   "svc_type": "flow",
@@ -747,7 +782,7 @@ This pattern: call a service that returns a record array, loop over it, extract 
 ### Step 1: Document type
 ```json
 {
-  "node_nsName": "mypkg.doctypes:account",
+  "node_nsName": "mypackage.doctypes:account",
   "node_pkg": "MyPackage",
   "node_type": "record",
   "field_type": "record",
@@ -763,7 +798,7 @@ This pattern: call a service that returns a record array, loop over it, extract 
 ### Step 2: Mock service returning record array
 ```json
 {
-  "node_nsName": "mypkg.services:searchAccounts",
+  "node_nsName": "mypackage.services:searchAccounts",
   "node_pkg": "MyPackage",
   "node_type": "service",
   "svc_type": "flow", "svc_subtype": "default", "svc_sigtype": "java 3.5",
@@ -772,13 +807,13 @@ This pattern: call a service that returns a record array, loop over it, extract 
     "sig_in": {"node_type":"record","field_type":"record","field_dim":"0","nillable":"true","javaclass":"com.wm.util.Values","rec_fields":[]},
     "sig_out": {"node_type":"record","field_type":"record","field_dim":"0","nillable":"true","javaclass":"com.wm.util.Values",
       "rec_fields":[
-        {"node_type":"record","field_name":"accounts","field_type":"recref","field_dim":"1","nillable":"true","rec_ref":"mypkg.doctypes:account","rec_closed":"true"}
+        {"node_type":"record","field_name":"accounts","field_type":"recref","field_dim":"1","nillable":"true","rec_ref":"mypackage.doctypes:account","rec_closed":"true"}
       ]
     }
   },
   "flow": {"type":"ROOT","version":"3.2","cleanup":"true","nodes":[
     {"type":"MAP","mode":"STANDALONE","nodes":[
-      {"type":"MAPSET","field":"/accounts;4;1;mypkg.doctypes:account","overwrite":"true","d_enc":"XMLValues","mapseti18n":"true",
+      {"type":"MAPSET","field":"/accounts;4;1;mypackage.doctypes:account","overwrite":"true","d_enc":"XMLValues","mapseti18n":"true",
        "data":"<Values version=\"2.0\"><array name=\"xml\" type=\"record\" depth=\"1\"><record javaclass=\"com.wm.util.Values\"><value name=\"accountName\">acc1</value><value name=\"customerName\">Alice</value></record><record javaclass=\"com.wm.util.Values\"><value name=\"accountName\">acc2</value><value name=\"customerName\">Bob</value></record></array></Values>"}
     ]}
   ]}
@@ -788,7 +823,7 @@ This pattern: call a service that returns a record array, loop over it, extract 
 ### Step 3: Main service with LOOP
 ```json
 {
-  "node_nsName": "mypkg.services:getCustomers",
+  "node_nsName": "mypackage.services:getCustomers",
   "node_pkg": "MyPackage",
   "node_type": "service",
   "svc_type": "flow", "svc_subtype": "default", "svc_sigtype": "java 3.5",
@@ -802,21 +837,21 @@ This pattern: call a service that returns a record array, loop over it, extract 
     }
   },
   "flow": {"type":"ROOT","version":"3.2","cleanup":"true","nodes":[
-    {"type":"INVOKE","service":"mypkg.services:searchAccounts","validate-in":"$none","validate-out":"$none"},
+    {"type":"INVOKE","service":"mypackage.services:searchAccounts","validate-in":"$none","validate-out":"$none"},
     {"type":"LOOP","in-array":"/accounts","out-array":"/customers","nodes":[
       {"type":"MAP","mode":"STANDALONE","nodes":[
-        {"type":"MAPCOPY","from":"/accounts;4;0;mypkg.doctypes:account/customerName;1;0","to":"/customers;1;0"}
+        {"type":"MAPCOPY","from":"/accounts;4;0;mypackage.doctypes:account/customerName;1;0","to":"/customers;1;0"}
       ]}
     ]},
     {"type":"MAP","mode":"STANDALONE","nodes":[
-      {"type":"MAPDELETE","field":"/accounts;4;1;mypkg.doctypes:account"}
+      {"type":"MAPDELETE","field":"/accounts;4;1;mypackage.doctypes:account"}
     ]}
   ]}
 }
 ```
 
 **Key points:**
-- MAPCOPY from path uses type 4 (RecordRef): `/accounts;4;0;mypkg.doctypes:account/customerName;1;0`
+- MAPCOPY from path uses type 4 (RecordRef): `/accounts;4;0;mypackage.doctypes:account/customerName;1;0`
 - Dimension is 0 (current iteration element, not the array)
 - Document type reference is required after the dimension
 - MAPDELETE after LOOP cleans up the temporary array from pipeline output
@@ -828,10 +863,10 @@ This pattern: call a service that returns a record array, loop over it, extract 
   "flow": {"type":"ROOT","version":"3.0","cleanup":"true","nodes":[
     {"type":"BRANCH","switch":"/action","nodes":[
       {"type":"SEQUENCE","label":"create","exit-on":"FAILURE","nodes":[
-        {"type":"INVOKE","service":"mypkg.services:createRecord","validate-in":"$none","validate-out":"$none"}
+        {"type":"INVOKE","service":"mypackage.services:createRecord","validate-in":"$none","validate-out":"$none"}
       ]},
       {"type":"SEQUENCE","label":"delete","exit-on":"FAILURE","nodes":[
-        {"type":"INVOKE","service":"mypkg.services:deleteRecord","validate-in":"$none","validate-out":"$none"}
+        {"type":"INVOKE","service":"mypackage.services:deleteRecord","validate-in":"$none","validate-out":"$none"}
       ]},
       {"type":"SEQUENCE","label":"$default","exit-on":"FAILURE","nodes":[
         {"type":"MAP","mode":"STANDALONE","nodes":[
@@ -852,7 +887,7 @@ Uses type 2 (Record) with nested paths -- NO LOOP needed for single-record acces
 ```json
 {
   "flow": {"type":"ROOT","version":"3.0","cleanup":"true","nodes":[
-    {"type":"INVOKE","service":"mypkg.adapters:getAccountDetails","validate-in":"$none","validate-out":"$none",
+    {"type":"INVOKE","service":"mypackage.adapters:getAccountDetails","validate-in":"$none","validate-out":"$none",
      "nodes":[
        {"type":"MAP","mode":"INPUT","nodes":[
          {"type":"MAPCOPY","from":"/accountID;1;0","to":"/getAccountDetailsInput;2;0/EXTERNAL_ID_1;1;0"}
@@ -903,11 +938,11 @@ Map JDBC adapter output fields to a typed document. Each field uses full nested 
 
 ```json
 {"type":"MAP","mode":"STANDALONE","nodes":[
-  {"type":"MAPCOPY","from":"/selectOrdersOutput;2;0/results;2;0/order_id;1;0","to":"/orders;4;0;mypkg.docTypes:OrderCanonical/id;1;0"},
-  {"type":"MAPCOPY","from":"/selectOrdersOutput;2;0/results;2;0/order_date;1;0","to":"/orders;4;0;mypkg.docTypes:OrderCanonical/date;1;0"},
-  {"type":"MAPCOPY","from":"/selectOrdersOutput;2;0/results;2;0/status;1;0","to":"/orders;4;0;mypkg.docTypes:OrderCanonical/status;1;0"},
-  {"type":"MAPCOPY","from":"/selectOrdersOutput;2;0/results;2;0/customer_id;1;0","to":"/orders;4;0;mypkg.docTypes:OrderCanonical/customer;2;0/id;1;0"},
-  {"type":"MAPCOPY","from":"/selectOrdersOutput;2;0/results;2;0/customer_name;1;0","to":"/orders;4;0;mypkg.docTypes:OrderCanonical/customer;2;0/name;1;0"},
+  {"type":"MAPCOPY","from":"/selectOrdersOutput;2;0/results;2;0/order_id;1;0","to":"/orders;4;0;mypackage.docTypes:OrderCanonical/id;1;0"},
+  {"type":"MAPCOPY","from":"/selectOrdersOutput;2;0/results;2;0/order_date;1;0","to":"/orders;4;0;mypackage.docTypes:OrderCanonical/date;1;0"},
+  {"type":"MAPCOPY","from":"/selectOrdersOutput;2;0/results;2;0/status;1;0","to":"/orders;4;0;mypackage.docTypes:OrderCanonical/status;1;0"},
+  {"type":"MAPCOPY","from":"/selectOrdersOutput;2;0/results;2;0/customer_id;1;0","to":"/orders;4;0;mypackage.docTypes:OrderCanonical/customer;2;0/id;1;0"},
+  {"type":"MAPCOPY","from":"/selectOrdersOutput;2;0/results;2;0/customer_name;1;0","to":"/orders;4;0;mypackage.docTypes:OrderCanonical/customer;2;0/name;1;0"},
   {"type":"MAPDELETE","field":"/selectOrdersOutput;2;0"}
 ]}
 ```
@@ -928,13 +963,13 @@ Receive JMS message, extract body, convert to JSON, persist to DB.
     ]}
   ]},
   {"type":"MAP","mode":"STANDALONE","nodes":[
-    {"type":"MAPCOPY","from":"/JMSMessage;4;0;pub.jms:JMSMessage/body;2;0/data;2;0","to":"/order;4;0;mypkg.docTypes:OrderCanonical"},
+    {"type":"MAPCOPY","from":"/JMSMessage;4;0;pub.jms:JMSMessage/body;2;0/data;2;0","to":"/order;4;0;mypackage.docTypes:OrderCanonical"},
     {"type":"MAPDELETE","field":"/JMSMessage;4;0;pub.jms:JMSMessage"}
   ]},
-  {"type":"INVOKE","service":"mypkg.jdbc:createOrder","validate-in":"$none","validate-out":"$none","nodes":[
+  {"type":"INVOKE","service":"mypackage.jdbc:createOrder","validate-in":"$none","validate-out":"$none","nodes":[
     {"type":"MAP","mode":"INPUT","nodes":[
-      {"type":"MAPCOPY","from":"/order;4;0;mypkg.docTypes:OrderCanonical/id;1;0","to":"/createOrderInput;2;0/order_id;1;0"},
-      {"type":"MAPCOPY","from":"/order;4;0;mypkg.docTypes:OrderCanonical/status;1;0","to":"/createOrderInput;2;0/status;1;0"}
+      {"type":"MAPCOPY","from":"/order;4;0;mypackage.docTypes:OrderCanonical/id;1;0","to":"/createOrderInput;2;0/order_id;1;0"},
+      {"type":"MAPCOPY","from":"/order;4;0;mypackage.docTypes:OrderCanonical/status;1;0","to":"/createOrderInput;2;0/status;1;0"}
     ]}
   ]}
 ]}}
@@ -965,7 +1000,7 @@ Convert document to XML, send to JMS queue, return HTTP 202.
 {"flow":{"type":"ROOT","version":"3.2","cleanup":"true","nodes":[
   {"type":"INVOKE","service":"pub.xml:documentToXMLString","validate-in":"$none","validate-out":"$none","nodes":[
     {"type":"MAP","mode":"INPUT","nodes":[
-      {"type":"MAPCOPY","from":"/request;4;0;mypkg.docTypes:OrderRequest","to":"/document;2;0"}
+      {"type":"MAPCOPY","from":"/request;4;0;mypackage.docTypes:OrderRequest","to":"/document;2;0"}
     ]}
   ]},
   {"type":"INVOKE","service":"pub.jms:send","validate-in":"$none","validate-out":"$none","nodes":[
@@ -995,7 +1030,7 @@ Call external REST API, branch on response code, map success/error responses.
       {"type":"MAPSET","field":"/httpMethod;1;0","overwrite":"true","d_enc":"XMLValues","mapseti18n":"true",
        "data":"<Values version=\"2.0\"><value name=\"xml\">POST</value></Values>"},
       {"type":"MAPSET","field":"/radNamespace;1;0","overwrite":"false","d_enc":"XMLValues","mapseti18n":"true",
-       "data":"<Values version=\"2.0\"><value name=\"xml\">mypkg.client:apiDescriptor</value></Values>"}
+       "data":"<Values version=\"2.0\"><value name=\"xml\">mypackage.client:apiDescriptor</value></Values>"}
     ]}
   ]},
   {"type":"BRANCH","switch":"","label-expressions":"true","nodes":[
@@ -1031,7 +1066,7 @@ Based on obsCustomerManagement:getCustomers pattern.
 
 ```json
 {
-  "node_nsName": "mypkg.services:getResource",
+  "node_nsName": "mypackage.services:getResource",
   "node_pkg": "MyPackage",
   "node_type": "service",
   "svc_type": "flow",
@@ -1083,7 +1118,7 @@ Based on obsCustomerManagement:getCustomers pattern.
           {
             "type": "SEQUENCE", "exit-on": "FAILURE", "comment": "call backend service",
             "nodes": [
-              {"type": "INVOKE", "service": "mypkg.impl:fetchResource", "validate-in": "$none", "validate-out": "$none"},
+              {"type": "INVOKE", "service": "mypackage.impl:fetchResource", "validate-in": "$none", "validate-out": "$none"},
               {"type": "MAP", "mode": "STANDALONE", "nodes": [
                 {"type": "MAPCOPY", "from": "/fetchOutput/data;1;0", "to": "/result;1;0"}
               ]}
@@ -1126,7 +1161,7 @@ Based on obsCustomerManagement:getCustomers pattern.
                    {"type": "MAPCOPY", "from": "/failureMessage;1;0", "to": "/message;1;0"},
                    {"type": "MAPSET", "field": "/function;1;0", "overwrite": "true",
                     "d_enc": "XMLValues", "mapseti18n": "true",
-                    "data": "<Values version=\"2.0\"><value name=\"xml\">mypkg.services:getResource</value></Values>"},
+                    "data": "<Values version=\"2.0\"><value name=\"xml\">mypackage.services:getResource</value></Values>"},
                    {"type": "MAPSET", "field": "/level;1;0", "overwrite": "true",
                     "d_enc": "XMLValues", "mapseti18n": "true",
                     "data": "<Values version=\"2.0\"><value name=\"xml\">Error</value></Values>"}
@@ -1270,7 +1305,7 @@ Retry a service call up to 3 times with 5-second intervals:
 {
   "type": "REPEAT", "count": "3", "repeat-interval": "5", "repeat-on": "FAILURE",
   "nodes": [
-    {"type": "INVOKE", "service": "mypkg.services:callExternalAPI", "validate-in": "$none", "validate-out": "$none"},
+    {"type": "INVOKE", "service": "mypackage.services:callExternalAPI", "validate-in": "$none", "validate-out": "$none"},
     {"type": "BRANCH", "switch": "/responseCode", "nodes": [
       {"type": "SEQUENCE", "label": "200", "exit-on": "FAILURE", "nodes": []},
       {"type": "SEQUENCE", "label": "$default", "exit-on": "FAILURE", "nodes": [
@@ -1299,7 +1334,7 @@ Process items from an array but stop after a configurable limit:
       {"type": "EXIT", "label": "%processedCount% >= %limit%", "from": "$loop", "signal": "SUCCESS"}
     ]},
     {"type": "SEQUENCE", "exit-on": "FAILURE", "nodes": [
-      {"type": "INVOKE", "service": "mypkg.services:processFile", "validate-in": "$none", "validate-out": "$none"},
+      {"type": "INVOKE", "service": "mypackage.services:processFile", "validate-in": "$none", "validate-out": "$none"},
       {"type": "MAP", "mode": "STANDALONE", "nodes": [
         {"type": "MAPINVOKE", "service": "pub.math:addInts", "validate-in": "$none", "validate-out": "$none", "invoke-order": "0",
          "nodes": [
@@ -1332,15 +1367,15 @@ Route processing based on complex conditions:
   "nodes": [
     {"type": "SEQUENCE", "label": "name != null &amp;&amp; status != null", "exit-on": "FAILURE",
      "comment": "both name and status provided",
-     "nodes": [{"type": "INVOKE", "service": "mypkg.services:searchByNameAndStatus"}]},
+     "nodes": [{"type": "INVOKE", "service": "mypackage.services:searchByNameAndStatus"}]},
     {"type": "SEQUENCE", "label": "name != null", "exit-on": "FAILURE",
      "comment": "only name provided",
-     "nodes": [{"type": "INVOKE", "service": "mypkg.services:searchByName"}]},
+     "nodes": [{"type": "INVOKE", "service": "mypackage.services:searchByName"}]},
     {"type": "SEQUENCE", "label": "status != null", "exit-on": "FAILURE",
      "comment": "only status provided",
-     "nodes": [{"type": "INVOKE", "service": "mypkg.services:searchByStatus"}]},
+     "nodes": [{"type": "INVOKE", "service": "mypackage.services:searchByStatus"}]},
     {"type": "SEQUENCE", "label": "$default", "exit-on": "FAILURE",
-     "nodes": [{"type": "INVOKE", "service": "mypkg.services:searchAll"}]}
+     "nodes": [{"type": "INVOKE", "service": "mypackage.services:searchAll"}]}
   ]
 }
 ```
@@ -1364,7 +1399,7 @@ Structure generated by IS when consuming a WSDL:
      ]},
     {"type": "MAP", "mode": "STANDALONE", "comment": "map request to SOAP body",
      "nodes": [
-       {"type": "MAPCOPY", "from": "/request;4;0;mypkg.docTypes:getCustomerInput", "to": "/request;2;0/getCustomer;2;0"},
+       {"type": "MAPCOPY", "from": "/request;4;0;mypackage.docTypes:getCustomerInput", "to": "/request;2;0/getCustomer;2;0"},
        {"type": "MAPSET", "field": "/soapProtocol;1;0", "overwrite": "true",
         "d_enc": "XMLValues", "mapseti18n": "true",
         "data": "<Values version=\"2.0\"><value name=\"xml\">SOAP 1.1 Protocol</value></Values>"}
@@ -1382,7 +1417,7 @@ Structure generated by IS when consuming a WSDL:
        {"type": "SEQUENCE", "label": "0", "exit-on": "FAILURE", "comment": "success",
         "nodes": [
           {"type": "MAP", "mode": "STANDALONE", "nodes": [
-            {"type": "MAPCOPY", "from": "/response;2;0/getCustomerResponse;2;0", "to": "/result;4;0;mypkg.docTypes:getCustomerOutput"},
+            {"type": "MAPCOPY", "from": "/response;2;0/getCustomerResponse;2;0", "to": "/result;4;0;mypackage.docTypes:getCustomerOutput"},
             {"type": "MAPDELETE", "field": "/response;2;0"},
             {"type": "MAPDELETE", "field": "/soapStatus;1;0"}
           ]}
@@ -1405,6 +1440,139 @@ Structure generated by IS when consuming a WSDL:
 - Request: map typed doc -> `/request;2;0/operationName;2;0`
 - Response: extract from `/response;2;0/operationNameResponse;2;0`
 - Fault: extract from `/response;2;0/fault;2;0`
+"#;
+
+const ADAPTER_CONNECTION_REF: &str = r#"# Adapter Connection Configuration Reference
+
+How to create an adapter connection node with `adapter_connection_create`.
+Everything below was verified against a live JDBC Adapter 10.3 / IS 12.
+
+## An adapter connection is NOT a JDBC pool
+
+| | `jdbc_pool_*` | `adapter_connection_*` |
+|---|---|---|
+| What | IS-internal connection pool | JCA connection node owned by an adapter |
+| Used by | the server itself (ISCoreAudit, TN, xref...) | adapter services (Select/Insert/Update/Delete), notifications |
+| Configured with | a JDBC **URL** + **Driver** class (`com.wm.dd.jdbc.*`) | discrete properties + **DataSource** class (`com.wm.dd.jdbcx.*`) |
+| Lives in | `config/jdbc/pool/<name>.xml` | a package namespace, as a node |
+
+`adapter_service_create` can only be built on an adapter connection. A JDBC pool
+will never work there, and the JDBC-pool vocabulary (url, uid, pwd, drivers,
+mincon/maxcon) is rejected by `connection_settings`.
+
+## The 5 rules
+
+1. **`adapter_type` is the adapter type, not the package.** Take it verbatim from
+   `adapter_type_list` -> `adapterName`. JDBC is **`JDBCAdapter`**.
+   `WmJDBCAdapter` is the *package* and fails with
+   `HTTP 500: [ART.114.232] Adapter Runtime (Metadata): Unable to get the adapter type "WmJDBCAdapter".`
+2. **`connection_settings` keys are the `systemName` values returned by
+   `adapter_connection_metadata`.** Call it first; never invent key names.
+   Properties whose metadata carries a `resourceDomain` only accept the listed values.
+3. **`connection_alias` carries no package prefix.** It is the namespace path of
+   the node, so it starts at the package's lowercase root folder:
+   `petstoreapi.connections:petstore`. Writing `PetstoreAPI.connections:petstore`
+   does NOT error -- unlike `put_node`, `createConnectionNode` creates missing
+   folders, so you silently get a folder literally named `PetstoreAPI` and the
+   alias you must use everywhere else changes. The package goes in
+   `package_name`, and there only.
+4. **Creation never validates the settings.** `createConnectionNode` accepts
+   nonsense (even `{}`) and returns HTTP 200. The configuration is only checked
+   when the connection is enabled -- so "created" proves nothing.
+5. **The node is created DISABLED.** Call `adapter_connection_enable`, then
+   `adapter_connection_state` and check `connectionState: enabled` and
+   `hasError: false`.
+
+## Workflow
+
+```
+adapter_type_list                      -> exact adapter type name
+adapter_connection_metadata(type, factory) -> the systemName of every setting
+package_create / folder_create         -> optional, the alias folders are auto-created
+adapter_connection_create(...)         -> node exists, disabled, unvalidated
+adapter_connection_enable(alias)       -> THIS is what validates the settings
+adapter_connection_state(alias)        -> connectionState=enabled, hasError=false
+adapter_resource_domain_lookup(...)    -> proves the DB is really reachable
+```
+
+## JDBC connection settings
+
+`connection_factory_type` = `com.wm.adapter.wmjdbc.connection.JDBCConnectionFactory`
+
+| systemName | Required | Notes |
+|---|---|---|
+| `datasourceClass` | **yes** | The only setting enforced at enable time. A DataSource class, see table below |
+| `serverName` | in practice | DB host |
+| `portNumber` | in practice | as a string: `"5432"` |
+| `databaseName` | in practice | DB / catalog name |
+| `user` | in practice | DB user |
+| `password` | in practice | plaintext here; IS stores it in the outbound password store |
+| `transactionType` | no | `LOCAL_TRANSACTION` \| `XA_TRANSACTION` \| `NO_TRANSACTION` |
+| `driverType` | no | `Default` |
+| `networkProtocol` | no | usually empty |
+| `otherProperties` | no | `property1=value1;property2=value2` |
+
+Pool sizing is NOT part of `connection_settings`: use the `pool_min` / `pool_max`
+parameters of the tool (they map to connectionManagerSettings).
+
+### DataSource classes bundled with webMethods (DataDirect)
+
+| Database | `datasourceClass` |
+|---|---|
+| PostgreSQL | `com.wm.dd.jdbcx.postgresql.PostgreSQLDataSource` |
+| SQL Server | `com.wm.dd.jdbcx.sqlserver.SQLServerDataSource` |
+| Oracle | `com.wm.dd.jdbcx.oracle.OracleDataSource` |
+| DB2 | `com.wm.dd.jdbcx.db2.DB2DataSource` |
+| MySQL | `com.wm.dd.jdbcx.mysql.MySQLDataSource` |
+| Informix | `com.wm.dd.jdbcx.informix.InformixDataSource` |
+| Sybase | `com.wm.dd.jdbcx.sybase.SybaseDataSource` |
+
+Watch the package name: `com.wm.dd.jdbcx.*` -- with an x -- are the DataSource classes
+the adapter needs; `com.wm.dd.jdbc.*` (what `jdbc_driver_list` returns) are Driver
+classes and belong to `jdbc_pool_add`. Passing a Driver class here fails at enable time.
+These DataDirect classes implement `DataSource` + `ConnectionPoolDataSource`, so
+they cover `NO_TRANSACTION` and `LOCAL_TRANSACTION`; `XA_TRANSACTION` requires a
+DataSource class that implements `javax.sql.XADataSource`.
+
+## Verified example -- PostgreSQL
+
+```json
+{
+  "connection_alias": "petstoreapi.connections:petstore",
+  "package_name": "PetstoreAPI",
+  "adapter_type": "JDBCAdapter",
+  "connection_factory_type": "com.wm.adapter.wmjdbc.connection.JDBCConnectionFactory",
+  "connection_settings": "{\"transactionType\":\"LOCAL_TRANSACTION\",\"driverType\":\"Default\",\"datasourceClass\":\"com.wm.dd.jdbcx.postgresql.PostgreSQLDataSource\",\"serverName\":\"localhost\",\"portNumber\":\"5432\",\"databaseName\":\"petstore\",\"user\":\"postgres\",\"password\":\"secret\",\"networkProtocol\":\"\",\"otherProperties\":\"\"}",
+  "pool_min": 1,
+  "pool_max": 10
+}
+```
+
+Then `adapter_connection_enable("petstoreapi.connections:petstore")`, and confirm with
+`adapter_resource_domain_lookup(connection_alias="petstoreapi.connections:petstore",
+service_template="com.wm.adapter.wmjdbc.services.Select",
+resource_domain_name="catalogNames")` -- if it returns the catalog list, the
+connection really talks to the database.
+
+SQL Server differs only in `datasourceClass` +
+`portNumber: "1433"`; Oracle uses `portNumber: "1521"` and often carries the
+service name in `otherProperties` (e.g. `ServiceName=ORCLPDB1`).
+
+## Error to cause
+
+| Message | Cause | Fix |
+|---|---|---|
+| `[ART.114.232] Unable to get the adapter type "X"` | `adapter_type` is a package name or a typo | use `adapter_type_list` -> `adapterName` (`JDBCAdapter`) |
+| `[ADA.1.200] The JDBC DataSource class "" cannot be located` | `datasourceClass` missing, or the whole settings object used the wrong key names | re-read `adapter_connection_metadata`, use the `systemName` keys |
+| `[ADA.1.200] ... class "com.wm.dd.jdbc.X" cannot be located` | a Driver class was passed instead of a DataSource class | use the `com.wm.dd.jdbcx.*` class |
+| `[ART.118.5042] Unable to enable connection resource` | credentials / host / port / database wrong, or DB unreachable | test the same coordinates with `jdbc_pool_test`, check the DB is up |
+| create returns 200 but the alias is absent from `adapter_connection_list` | the alias got a package prefix, so the node lives elsewhere | recreate with `folder:name` and delete the wrong node |
+| `Invalid JSON: expected value at line 1 column 1` | `connection_settings` was not a JSON **string** | pass a serialized JSON object, not `key=value` text |
+
+## Next step
+
+Once `connectionState` is `enabled`, build adapter services on top of it:
+see `wm://docs/adapter-service-reference`.
 "#;
 
 const ADAPTER_SERVICE_REF: &str = r#"# Adapter Service Configuration Reference

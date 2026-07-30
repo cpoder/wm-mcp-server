@@ -4,14 +4,8 @@ impl super::ISClient {
     // ── Adapter Connection Management ──────────────────────────────────
 
     pub async fn adapter_type_list(&self) -> Result<Value, String> {
-        let r = self
-            .client
-            .get(self.url("/invoke/wm.art.admin:retrieveAdapterTypesList"))
-            .send()
+        self.invoke_get("wm.art.admin:retrieveAdapterTypesList")
             .await
-            .map_err(|e| e.to_string())?;
-        r.error_for_status_ref().map_err(|e| e.to_string())?;
-        r.json().await.map_err(|e| e.to_string())
     }
 
     pub async fn adapter_connection_metadata(
@@ -19,29 +13,19 @@ impl super::ISClient {
         adapter_type: &str,
         factory_type: &str,
     ) -> Result<Value, String> {
-        let r = self
-            .client
-            .post(self.url("/invoke/wm.art.dev.connection:fetchConnectionMetadata"))
-            .json(&json!({
+        self.invoke_post(
+            "wm.art.dev.connection:fetchConnectionMetadata",
+            &json!({
                 "adapterTypeName": adapter_type,
                 "connectionFactoryType": factory_type,
-            }))
-            .send()
-            .await
-            .map_err(|e| e.to_string())?;
-        r.error_for_status_ref().map_err(|e| e.to_string())?;
-        r.json().await.map_err(|e| e.to_string())
+            }),
+        )
+        .await
     }
 
     pub async fn adapter_connection_list(&self) -> Result<Value, String> {
-        let r = self
-            .client
-            .get(self.url("/invoke/wm.art.admin.connection:listAllResources"))
-            .send()
+        self.invoke_get("wm.art.admin.connection:listAllResources")
             .await
-            .map_err(|e| format!("{e}"))?;
-        r.error_for_status_ref().map_err(|e| e.to_string())?;
-        r.json().await.map_err(|e| e.to_string())
     }
 
     pub async fn adapter_connection_create(
@@ -53,35 +37,35 @@ impl super::ISClient {
         connection_settings: &Value,
         connection_manager_settings: &Value,
     ) -> Result<Value, String> {
-        let r = self
-            .client
-            .post(self.url("/invoke/wm.art.dev.connection:createConnectionNode"))
-            .json(&json!({
+        self.invoke_post(
+            "wm.art.dev.connection:createConnectionNode",
+            &json!({
                 "connectionAlias": connection_alias,
                 "packageName": package_name,
                 "adapterTypeName": adapter_type,
                 "connectionFactoryType": connection_factory_type,
                 "connectionSettings": connection_settings,
                 "connectionManagerSettings": connection_manager_settings,
-            }))
-            .send()
-            .await
-            .map_err(|e| e.to_string())?;
-        r.error_for_status_ref().map_err(|e| e.to_string())?;
-        let text = r.text().await.map_err(|e| e.to_string())?;
-        let truncated: String = text.chars().take(500).collect();
-        Ok(json!({"status": "created", "connection": connection_alias, "response": truncated}))
+            }),
+        )
+        .await?;
+        // createConnectionNode just echoes the request pipeline back, so there is
+        // nothing worth returning from the body. What the caller actually needs to
+        // know is that the node is born DISABLED and is useless until enabled.
+        Ok(json!({
+            "status": "created",
+            "connection": connection_alias,
+            "state": "disabled",
+            "next_step": "call adapter_connection_enable, then adapter_connection_state to confirm connectionState=enabled",
+        }))
     }
 
     pub async fn adapter_connection_enable(&self, connection_alias: &str) -> Result<Value, String> {
-        let r = self
-            .client
-            .post(self.url("/invoke/pub.art.connection:enableConnection"))
-            .json(&json!({"connectionAlias": connection_alias}))
-            .send()
-            .await
-            .map_err(|e| e.to_string())?;
-        r.error_for_status_ref().map_err(|e| e.to_string())?;
+        self.invoke_post(
+            "pub.art.connection:enableConnection",
+            &json!({"connectionAlias": connection_alias}),
+        )
+        .await?;
         Ok(json!({"status": "enabled", "connection": connection_alias}))
     }
 
@@ -89,27 +73,20 @@ impl super::ISClient {
         &self,
         connection_alias: &str,
     ) -> Result<Value, String> {
-        let r = self
-            .client
-            .post(self.url("/invoke/pub.art.connection:disableConnection"))
-            .json(&json!({"connectionAlias": connection_alias}))
-            .send()
-            .await
-            .map_err(|e| e.to_string())?;
-        r.error_for_status_ref().map_err(|e| e.to_string())?;
+        self.invoke_post(
+            "pub.art.connection:disableConnection",
+            &json!({"connectionAlias": connection_alias}),
+        )
+        .await?;
         Ok(json!({"status": "disabled", "connection": connection_alias}))
     }
 
     pub async fn adapter_connection_state(&self, connection_alias: &str) -> Result<Value, String> {
-        let r = self
-            .client
-            .post(self.url("/invoke/pub.art.connection:queryConnectionState"))
-            .json(&json!({"connectionAlias": connection_alias}))
-            .send()
-            .await
-            .map_err(|e| e.to_string())?;
-        r.error_for_status_ref().map_err(|e| e.to_string())?;
-        r.json().await.map_err(|e| e.to_string())
+        self.invoke_post(
+            "pub.art.connection:queryConnectionState",
+            &json!({"connectionAlias": connection_alias}),
+        )
+        .await
     }
 
     // ── Adapter Listener Management ────────────────────────────────────
@@ -122,8 +99,8 @@ impl super::ISClient {
             .send()
             .await
             .map_err(|e| e.to_string())?;
-        r.error_for_status_ref().map_err(|e| e.to_string())?;
-        r.json().await.map_err(|e| e.to_string())
+        let text = super::read_checked(r).await?;
+        serde_json::from_str(&text).map_err(|e| e.to_string())
     }
 
     pub async fn adapter_listener_create(
@@ -153,8 +130,7 @@ impl super::ISClient {
             .send()
             .await
             .map_err(|e| e.to_string())?;
-        r.error_for_status_ref().map_err(|e| e.to_string())?;
-        let text = r.text().await.map_err(|e| e.to_string())?;
+        let text = super::read_checked(r).await?;
         let truncated: String = text.chars().take(500).collect();
         Ok(json!({"status": "created", "listener": listener_alias, "response": truncated}))
     }
@@ -167,7 +143,7 @@ impl super::ISClient {
             .send()
             .await
             .map_err(|e| e.to_string())?;
-        r.error_for_status_ref().map_err(|e| e.to_string())?;
+        super::read_checked(r).await?;
         Ok(json!({"status": "enabled", "listener": listener_alias}))
     }
 
@@ -179,7 +155,7 @@ impl super::ISClient {
             .send()
             .await
             .map_err(|e| e.to_string())?;
-        r.error_for_status_ref().map_err(|e| e.to_string())?;
+        super::read_checked(r).await?;
         Ok(json!({"status": "disabled", "listener": listener_alias}))
     }
 
@@ -212,8 +188,7 @@ impl super::ISClient {
             .send()
             .await
             .map_err(|e| e.to_string())?;
-        r.error_for_status_ref().map_err(|e| e.to_string())?;
-        let text = r.text().await.map_err(|e| e.to_string())?;
+        let text = super::read_checked(r).await?;
         let truncated: String = text.chars().take(500).collect();
         Ok(json!({"status": "created", "service": service_name, "response": truncated}))
     }
@@ -228,8 +203,8 @@ impl super::ISClient {
             .send()
             .await
             .map_err(|e| e.to_string())?;
-        r.error_for_status_ref().map_err(|e| e.to_string())?;
-        r.json().await.map_err(|e| e.to_string())
+        let text = super::read_checked(r).await?;
+        serde_json::from_str(&text).map_err(|e| e.to_string())
     }
 
     pub async fn adapter_notification_create_polling(
@@ -259,8 +234,7 @@ impl super::ISClient {
             .send()
             .await
             .map_err(|e| e.to_string())?;
-        r.error_for_status_ref().map_err(|e| e.to_string())?;
-        let text = r.text().await.map_err(|e| e.to_string())?;
+        let text = super::read_checked(r).await?;
         let truncated: String = text.chars().take(500).collect();
         Ok(json!({"status": "created", "notification": notification_name, "response": truncated}))
     }
@@ -292,8 +266,7 @@ impl super::ISClient {
             .send()
             .await
             .map_err(|e| e.to_string())?;
-        r.error_for_status_ref().map_err(|e| e.to_string())?;
-        let text = r.text().await.map_err(|e| e.to_string())?;
+        let text = super::read_checked(r).await?;
         let truncated: String = text.chars().take(500).collect();
         Ok(json!({"status": "created", "notification": notification_name, "response": truncated}))
     }

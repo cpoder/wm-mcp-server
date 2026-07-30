@@ -23,21 +23,27 @@ pub struct AdapterConnectionMetadataParam {
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct AdapterConnectionCreateParam {
-    #[schemars(description = "Alias like \"mypkg.connections:mydb\"")]
+    #[schemars(
+        description = "Namespace path of the connection node: \"folder.subFolder:name\". NEVER prefix it with the package name -- that goes in package_name and would create a bogus folder. For package PetstoreAPI, whose root folder is petstoreapi: correct = \"petstoreapi.connections:petstore\", wrong = \"PetstoreAPI.connections:petstore\"."
+    )]
     pub connection_alias: String,
-    #[schemars(description = "Package name")]
+    #[schemars(description = "Package that will own the connection node, e.g. \"PetstoreAPI\"")]
     pub package_name: String,
-    #[schemars(description = "\"WmJDBCAdapter\", \"WmSAP\", \"WmOPCAdapter\"")]
+    #[schemars(
+        description = "Adapter type name from adapter_type_list -- NOT the package name. Use \"JDBCAdapter\" (the package is WmJDBCAdapter, which is REJECTED here), \"WmSAP\", \"WmOPCAdapter\", \"wmMQAdapter\"."
+    )]
     pub adapter_type: String,
     #[schemars(
-        description = "Factory class name, e.g. \"com.wm.adapter.wmjdbc.connection.JDBCConnectionFactory\""
+        description = "Connection factory class. JDBC: \"com.wm.adapter.wmjdbc.connection.JDBCConnectionFactory\""
     )]
     pub connection_factory_type: String,
-    #[schemars(description = "JSON string of connection properties")]
+    #[schemars(
+        description = "JSON object (as a string) mapping each property's systemName to its value -- get the exact names from adapter_connection_metadata, do not invent them. JDBC example: {\"transactionType\":\"LOCAL_TRANSACTION\",\"driverType\":\"Default\",\"datasourceClass\":\"com.wm.dd.jdbcx.postgresql.PostgreSQLDataSource\",\"serverName\":\"localhost\",\"portNumber\":\"5432\",\"databaseName\":\"petstore\",\"user\":\"postgres\",\"password\":\"secret\",\"networkProtocol\":\"\",\"otherProperties\":\"\"}. There is no url/dbUrl/uid/pwd/host/driverClass property -- those all fail."
+    )]
     pub connection_settings: String,
-    #[schemars(description = "Min pool size")]
+    #[schemars(description = "Min pool size (default 1)")]
     pub pool_min: Option<i32>,
-    #[schemars(description = "Max pool size")]
+    #[schemars(description = "Max pool size (default 10)")]
     pub pool_max: Option<i32>,
     #[schemars(description = "Target IS instance name (omit for default)")]
     pub instance: Option<String>,

@@ -57,7 +57,7 @@ Compatible with any MCP client: [IBM Bob](https://www.ibm.com/products/bob), [Cl
 | **IP access** | Global IP allow/deny rules | 4 |
 | **WebSocket** | Session management, endpoint creation, broadcast | 4 |
 
-**339 tools + 9 interactive prompts + 7 RAG resources** in total. **184 end-to-end tests** validated against a live IS with real infrastructure (Mosquitto MQTT broker, ActiveMQ JMS, MySQL).
+**339 tools + 9 interactive prompts + 8 RAG resources** in total. **184 end-to-end tests** validated against a live IS with real infrastructure (Mosquitto MQTT broker, ActiveMQ JMS, MySQL).
 
 ### Interactive setup wizards (prompts)
 
@@ -197,7 +197,7 @@ AI Assistant ──MCP (stdio/HTTP)──> wm-mcp-server (Rust) ──HTTP/JSON�
 
 All operations use IS built-in HTTP services. No filesystem access needed for most operations (marketplace install requires local access to the IS packages directory).
 
-Flow services are created via `wm.server.ns/putNode` which accepts the full flow tree as JSON -- the same `FlowElement` / `Values` serialization used internally by the IS runtime. The server includes 7 embedded RAG resources: comprehensive flow language documentation, 15 working putNode examples (including TRY/CATCH, LOOP, BRANCH, MAPINVOKE, transactions), adapter service configuration guides, an FSL language reference, and on-prem provisioning / database setup notes.
+Flow services are created via `wm.server.ns/putNode` which accepts the full flow tree as JSON -- the same `FlowElement` / `Values` serialization used internally by the IS runtime. The server includes 8 embedded RAG resources: comprehensive flow language documentation, 15 working putNode examples (including TRY/CATCH, LOOP, BRANCH, MAPINVOKE, transactions), adapter connection and adapter service configuration guides, an FSL language reference, and on-prem provisioning / database setup notes.
 
 ### Transport modes
 

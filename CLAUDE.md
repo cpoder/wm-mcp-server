@@ -14,7 +14,8 @@ création de flow non triviale, lis dans l'ordre :
 2. `wm://docs/putnode-examples` — exemples de JSON `put_node` testés et fonctionnels
 3. `wm://docs/builtin-services` — signatures des services `pub.*` que tu vas invoquer
 4. `wm://docs/flow-steps-reference` — sémantique INVOKE/BRANCH/LOOP/MAP/SEQUENCE/REPEAT/EXIT
-5. `wm://docs/adapter-service-reference` — uniquement pour les services adaptateur JDBC
+5. `wm://docs/adapter-connection-reference` — connexions adaptateur (JDBC & co.)
+6. `wm://docs/adapter-service-reference` — uniquement pour les services adaptateur JDBC
 
 Ne devine JAMAIS un chemin de service IS ni la structure d'un nœud. Si tu n'es
 pas sûr d'un format, **lis un nœud existant qui marche** avec `node_get` et
@@ -34,7 +35,16 @@ sers-t'en de modèle.
 1. **Package** : vérifie qu'il existe, est activé et inscriptible
    (`package_list` / `package_info`). Sinon `package_create`.
 2. **Dossiers parents** : crée chaque dossier de l'arborescence AVANT le service
-   (`folder_create`). Un `put_node` dans un dossier inexistant échoue.
+   (`folder_create`, un appel par niveau — les parents ne sont pas créés
+   implicitement). Un `put_node` dans un dossier inexistant échoue avec
+   `[ISS.0081.9001] Node ... does not exist`.
+   **Arborescence** : le namespace IS est **commun à tous les packages**, donc un
+   package possède exactement **un dossier racine, son nom en minuscules**, et
+   tout le reste est imbriqué dessous :
+   `PetstoreAPI` → `petstoreapi`, puis `petstoreapi.api`, `petstoreapi.adapter`.
+   Un nom composé se découpe en segments (`WxEdiAddon` → `wx.edi.addon`).
+   Créer `api` ou `services` directement à la racine du package est une erreur :
+   ces noms génériques entrent en collision avec les autres packages.
 3. **Document types** : si ta signature ou tes mappings utilisent des champs
    RecordRef (type 4) ou des doc types, **crée-les d'abord**
    (`document_type_create` puis `put_node` pour les champs). Référencer un doc
@@ -48,10 +58,14 @@ sers-t'en de modèle.
 - **Jamais de préfixe avec le nom du package (LA cause des 500)** : `node_nsName`
   est un chemin de **dossiers** + service (`dossier.sousDossier:service`) ; il ne
   contient JAMAIS le nom du package, lequel va uniquement dans `node_pkg`.
-  Correct : `node_nsName = commandes.api:creer` + `node_pkg = MonPackage`.
+  Correct : `node_nsName = monpackage.commandes.api:creer` + `node_pkg = MonPackage`.
   FAUX : `node_nsName = MonPackage.commandes.api:creer` → 500. Même règle pour
   `folder_create`, `document_type_create`, `node_delete` : le chemin ne contient
   jamais le package.
+  La raison : chaque segment du chemin est un **dossier qui doit déjà exister**.
+  `MonPackage` (PascalCase) est un package, pas un dossier → `[ISS.0081.9001]`.
+  `monpackage` en minuscules marche parce que c'est le dossier racine que tu as
+  créé à l'étape 2.
 - **Identité** : `node_nsName` = `"dossier.sousDossier:nomService"`, `node_pkg`
   = nom du package, `node_type` = `"service"`, `svc_type` = `"flow"`,
   `svc_subtype` = `"default"`, `svc_sigtype` = `"java 3.5"`.
@@ -90,6 +104,39 @@ exploite-le au lieu de relancer un JSON identique. Correspondances fréquentes :
 | `already exists` | nœud déjà présent | `node_get` pour comparer, ou supprime/mets à jour |
 | `not writable` / package désactivé | package read-only/désactivé | active le package, ou choisis-en un autre |
 | `has dependents` à la suppression | d'autres nœuds référencent celui-ci | `ns_dep_get_dependents` avant `node_delete` |
+
+## Connexions adaptateur JDBC (≠ pools JDBC)
+
+Un **pool JDBC** (`jdbc_pool_*`) sert à l'IS lui-même (ISCoreAudit, TN, xref).
+Une **connexion adaptateur** (`adapter_connection_*`) est un nœud JCA dans un
+package : c'est la seule chose sur laquelle `adapter_service_create` peut
+s'appuyer. Le vocabulaire des pools (url, uid, pwd, drivers, mincon/maxcon)
+n'existe pas dans `connection_settings`.
+
+Séquence obligatoire — détails dans `wm://docs/adapter-connection-reference` :
+
+1. `adapter_type_list` → prends `adapterName` **tel quel**. JDBC = `JDBCAdapter`.
+   `WmJDBCAdapter` est le **package** → 500 `[ART.114.232] Unable to get the
+   adapter type`.
+2. `adapter_connection_metadata` → le `systemName` de chaque propriété EST la clé
+   de `connection_settings`. JDBC : `datasourceClass` (obligatoire), `serverName`,
+   `portNumber`, `databaseName`, `user`, `password`, plus `transactionType` /
+   `driverType` optionnels. Aucune URL JDBC n'est acceptée ici.
+   La classe DataSource s'écrit `com.wm.dd.jdbcx.*` — avec un x : les
+   `com.wm.dd.jdbc.*` que renvoie `jdbc_driver_list` sont des Driver, réservés
+   aux pools.
+3. `adapter_connection_create` avec `connection_alias` = chemin de dossiers
+   partant de la racine minuscule du package (`petstoreapi.connections:petstore`)
+   — **jamais** `PetstoreAPI.connections:petstore` : contrairement à `put_node`,
+   `createConnectionNode` crée les dossiers manquants, donc ça ne lève aucune
+   erreur mais fabrique un dossier nommé comme le package, et l'alias réel n'est
+   plus celui que tu attends.
+4. `adapter_connection_enable` : la création n'est **pas** validée (même `{}`
+   passe en HTTP 200, le nœud naît désactivé). C'est l'activation qui teste
+   vraiment la configuration.
+5. `adapter_connection_state` → `connectionState: enabled`, `hasError: false`,
+   puis `adapter_resource_domain_lookup` (`catalogNames`) pour prouver que la
+   base répond.
 
 ## Suppression sûre
 

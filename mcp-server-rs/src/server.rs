@@ -162,7 +162,9 @@ impl WmServer {
         json_result(&c.package_list().await.map_err(mcp_err)?)
     }
 
-    #[tool(description = "Create and activate a new package.")]
+    #[tool(
+        description = "Create and activate a new package.\n\nA package alone holds nothing: right after creating it, create its single root namespace folder with folder_create -- the package name in lowercase (package \"PetstoreAPI\" -> folder \"petstoreapi\"). Every other folder of that package goes UNDER that root (\"petstoreapi.api\", \"petstoreapi.adapter\"). Never create a bare functional folder such as \"api\" or \"services\" at the top level: the IS namespace is shared by all packages, so those names collide across packages."
+    )]
     async fn package_create(
         &self,
         Parameters(p): Parameters<PackageNameParam>,
@@ -239,7 +241,7 @@ impl WmServer {
     // ── Folder Management ──────────────────────────────────────────────
 
     #[tool(
-        description = "Create a folder (namespace) in a package. Create parent folders first for nested paths."
+        description = "Create a folder (namespace) in a package.\n\nCreate every parent before its child: \"petstoreapi\", then \"petstoreapi.api\", then \"petstoreapi.api.pets\". A single call does NOT create intermediate folders, and put_node into a missing folder fails with [ISS.0081.9001] Node ... does not exist.\n\nNamespace layout: a package owns exactly ONE top-level folder, named after the package in lowercase, and everything else nests under it. The IS namespace is shared across packages, so top-level \"api\"/\"util\"/\"services\" folders collide between packages."
     )]
     async fn folder_create(
         &self,
@@ -269,7 +271,7 @@ impl WmServer {
     }
 
     #[tool(
-        description = "Create or update a namespace node (flow service, document type, etc.) via the IS putNode API.\n\nThis is THE core API for creating flow services with full logic, signatures, and flow steps.\nIt also works for updating document types with field definitions.\n\nThe node_data JSON must follow the IS Values serialization format.\n\nEXAMPLE - Complete flow service with signature and flow logic:\n{\n  \"node_nsName\": \"mypkg.services:greet\",\n  \"node_pkg\": \"MyPackage\",\n  \"node_type\": \"service\",\n  \"svc_type\": \"flow\",\n  \"svc_subtype\": \"default\",\n  \"svc_sigtype\": \"java 3.5\",\n  \"stateless\": \"yes\",\n  \"pipeline_option\": 1,\n  \"svc_sig\": {\n    \"sig_in\": {\n      \"node_type\": \"record\", \"field_type\": \"record\", \"field_dim\": \"0\", \"nillable\": \"true\",\n      \"rec_fields\": [\n        {\"node_type\": \"field\", \"field_name\": \"name\", \"field_type\": \"string\", \"field_dim\": \"0\", \"nillable\": \"true\"}\n      ]\n    },\n    \"sig_out\": {\n      \"node_type\": \"record\", \"field_type\": \"record\", \"field_dim\": \"0\", \"nillable\": \"true\",\n      \"rec_fields\": [\n        {\"node_type\": \"field\", \"field_name\": \"greeting\", \"field_type\": \"string\", \"field_dim\": \"0\", \"nillable\": \"true\"}\n      ]\n    }\n  },\n  \"flow\": {\n    \"type\": \"ROOT\", \"version\": \"3.0\", \"cleanup\": \"true\",\n    \"nodes\": [\n      {\n        \"type\": \"MAP\", \"mode\": \"STANDALONE\",\n        \"nodes\": [\n          {\"type\": \"MAPSET\", \"field\": \"/name;1;0\", \"overwrite\": \"false\",\n           \"d_enc\": \"XMLValues\", \"mapseti18n\": \"true\",\n           \"data\": \"<Values version=\\\"2.0\\\"><value name=\\\"xml\\\">World</value></Values>\"}\n        ]\n      },\n      {\n        \"type\": \"INVOKE\", \"service\": \"pub.string:concat\",\n        \"validate-in\": \"$none\", \"validate-out\": \"$none\",\n        \"nodes\": [\n          {\"type\": \"MAP\", \"mode\": \"INPUT\", \"nodes\": [\n            {\"type\": \"MAPSET\", \"field\": \"/inString1;1;0\", \"overwrite\": \"true\",\n             \"d_enc\": \"XMLValues\", \"mapseti18n\": \"true\",\n             \"data\": \"<Values version=\\\"2.0\\\"><value name=\\\"xml\\\">Hello, </value></Values>\"},\n            {\"type\": \"MAPCOPY\", \"from\": \"/name;1;0\", \"to\": \"/inString2;1;0\"}\n          ]},\n          {\"type\": \"MAP\", \"mode\": \"OUTPUT\", \"nodes\": [\n            {\"type\": \"MAPCOPY\", \"from\": \"/value;1;0\", \"to\": \"/greeting;1;0\"}\n          ]}\n        ]\n      }\n    ]\n  }\n}"
+        description = "Create or update a namespace node (flow service, document type, etc.) via the IS putNode API.\n\nThis is THE core API for creating flow services with full logic, signatures, and flow steps.\nIt also works for updating document types with field definitions.\n\nThe node_data JSON must follow the IS Values serialization format.\n\nEXAMPLE - Complete flow service with signature and flow logic:\n{\n  \"node_nsName\": \"mypackage.services:greet\",\n  \"node_pkg\": \"MyPackage\",\n  \"node_type\": \"service\",\n  \"svc_type\": \"flow\",\n  \"svc_subtype\": \"default\",\n  \"svc_sigtype\": \"java 3.5\",\n  \"stateless\": \"yes\",\n  \"pipeline_option\": 1,\n  \"svc_sig\": {\n    \"sig_in\": {\n      \"node_type\": \"record\", \"field_type\": \"record\", \"field_dim\": \"0\", \"nillable\": \"true\",\n      \"rec_fields\": [\n        {\"node_type\": \"field\", \"field_name\": \"name\", \"field_type\": \"string\", \"field_dim\": \"0\", \"nillable\": \"true\"}\n      ]\n    },\n    \"sig_out\": {\n      \"node_type\": \"record\", \"field_type\": \"record\", \"field_dim\": \"0\", \"nillable\": \"true\",\n      \"rec_fields\": [\n        {\"node_type\": \"field\", \"field_name\": \"greeting\", \"field_type\": \"string\", \"field_dim\": \"0\", \"nillable\": \"true\"}\n      ]\n    }\n  },\n  \"flow\": {\n    \"type\": \"ROOT\", \"version\": \"3.0\", \"cleanup\": \"true\",\n    \"nodes\": [\n      {\n        \"type\": \"MAP\", \"mode\": \"STANDALONE\",\n        \"nodes\": [\n          {\"type\": \"MAPSET\", \"field\": \"/name;1;0\", \"overwrite\": \"false\",\n           \"d_enc\": \"XMLValues\", \"mapseti18n\": \"true\",\n           \"data\": \"<Values version=\\\"2.0\\\"><value name=\\\"xml\\\">World</value></Values>\"}\n        ]\n      },\n      {\n        \"type\": \"INVOKE\", \"service\": \"pub.string:concat\",\n        \"validate-in\": \"$none\", \"validate-out\": \"$none\",\n        \"nodes\": [\n          {\"type\": \"MAP\", \"mode\": \"INPUT\", \"nodes\": [\n            {\"type\": \"MAPSET\", \"field\": \"/inString1;1;0\", \"overwrite\": \"true\",\n             \"d_enc\": \"XMLValues\", \"mapseti18n\": \"true\",\n             \"data\": \"<Values version=\\\"2.0\\\"><value name=\\\"xml\\\">Hello, </value></Values>\"},\n            {\"type\": \"MAPCOPY\", \"from\": \"/name;1;0\", \"to\": \"/inString2;1;0\"}\n          ]},\n          {\"type\": \"MAP\", \"mode\": \"OUTPUT\", \"nodes\": [\n            {\"type\": \"MAPCOPY\", \"from\": \"/value;1;0\", \"to\": \"/greeting;1;0\"}\n          ]}\n        ]\n      }\n    ]\n  }\n}"
     )]
     async fn put_node(
         &self,
@@ -493,7 +495,7 @@ impl WmServer {
     }
 
     #[tool(
-        description = "Get the metadata (available settings/parameters) for creating connections of a specific adapter type.\n\nUse this to discover what connectionSettings parameters are required."
+        description = "Get the metadata (available settings/parameters) for creating connections of a specific adapter type.\n\nCall this BEFORE adapter_connection_create: the `systemName` of each returned property is exactly the key to put in connection_settings, and `resourceDomain` lists the legal values when the property is an enum. Never guess these key names.\n\nadapter_type must come from adapter_type_list (e.g. \"JDBCAdapter\"), not the package name (\"WmJDBCAdapter\" is rejected)."
     )]
     async fn adapter_connection_metadata(
         &self,
@@ -518,7 +520,9 @@ impl WmServer {
         json_result(&c.adapter_connection_list().await.map_err(mcp_err)?)
     }
 
-    #[tool(description = "Create an adapter connection via WmART API.")]
+    #[tool(
+        description = "Create an adapter connection node (WmART createConnectionNode). Full recipe and troubleshooting: resource wm://docs/adapter-connection-reference.\n\nThree rules that cause every failure:\n1. adapter_type is the ADAPTER TYPE, not the package: \"JDBCAdapter\" works, \"WmJDBCAdapter\" returns 500 [ART.114.232].\n2. connection_settings keys are the property systemNames returned by adapter_connection_metadata (JDBC: transactionType, driverType, datasourceClass, serverName, portNumber, databaseName, user, password). A JDBC URL, dbUrl, uid/pwd or host/port/database will NOT work.\n3. connection_alias carries no package prefix: \"petstoreapi.connections:petstore\" (existing folders, lowercase root), not \"PetstoreAPI.connections:petstore\" (that silently creates a folder named PetstoreAPI).\n\nThe node is created DISABLED -- call adapter_connection_enable afterwards, then adapter_connection_state to confirm.\n\nWorking PostgreSQL example:\n  adapter_type = \"JDBCAdapter\"\n  connection_factory_type = \"com.wm.adapter.wmjdbc.connection.JDBCConnectionFactory\"\n  connection_settings = {\"transactionType\":\"LOCAL_TRANSACTION\",\"driverType\":\"Default\",\"datasourceClass\":\"com.wm.dd.jdbcx.postgresql.PostgreSQLDataSource\",\"serverName\":\"localhost\",\"portNumber\":\"5432\",\"databaseName\":\"petstore\",\"user\":\"postgres\",\"password\":\"secret\",\"networkProtocol\":\"\",\"otherProperties\":\"\"}"
+    )]
     async fn adapter_connection_create(
         &self,
         Parameters(p): Parameters<AdapterConnectionCreateParam>,
@@ -5115,6 +5119,16 @@ impl ServerHandler for WmServer {
                 "4. adapter_resource_domain_lookup(..., resource_domain_name=\"columnInfo\", values=[\"catalog\",\"schema\",\"table\"]) -> list columns\n",
                 "Use service_template=\"com.wm.adapter.wmjdbc.services.Select\" for querying.\n",
                 "NEVER call service_invoke with made-up IS service paths to browse metadata -- use the tools above.\n\n",
+                "ADAPTER CONNECTION CREATION (prerequisite for every adapter service):\n",
+                "Read 'wm://docs/adapter-connection-reference' before calling adapter_connection_create. Never brute-force its JSON.\n",
+                "1. adapter_type_list -> take adapterName VERBATIM. JDBC is \"JDBCAdapter\"; \"WmJDBCAdapter\" is the PACKAGE and returns 500 [ART.114.232].\n",
+                "2. adapter_connection_metadata(adapter_type, connection_factory_type) -> each property's `systemName` is a connection_settings key.\n",
+                "   JDBC needs: transactionType, driverType, datasourceClass, serverName, portNumber, databaseName, user, password.\n",
+                "   There is NO url/dbUrl/uid/pwd/host/database/driverClass property -- a JDBC URL string is never accepted here.\n",
+                "3. adapter_connection_create(...) with connection_alias = \"pkgroot.folder:name\" (NEVER \"PackageName.folder:name\").\n",
+                "4. adapter_connection_enable(alias) -- the node is created DISABLED and unusable until enabled.\n",
+                "5. adapter_connection_state(alias) -> expect connectionState=enabled.\n",
+                "JDBC adapter connections (created here) are NOT the same thing as internal JDBC pools (jdbc_pool_*, used by IS itself).\n\n",
                 "ADAPTER SERVICE CREATION (Select, Insert, Update, Delete):\n",
                 "IMPORTANT: adapter_service_create creates an EMPTY shell unless you pass complete adapter_service_settings.\n",
                 "You MUST include table and column configuration, otherwise the service will have NO inputs or outputs.\n\n",
@@ -5158,6 +5172,10 @@ impl ServerHandler for WmServer {
                 "and 'wm://docs/putnode-examples' for tested working JSON patterns. Read 'wm://docs/builtin-services' for service signatures.\n\n",
                 "Key rules:\n",
                 "- Services are identified by \"folder.subfolder:serviceName\" paths\n",
+                "- NAMESPACE LAYOUT: the IS namespace is shared by ALL packages. A package owns exactly ONE top-level\n",
+                "  folder, its own name in lowercase, and everything nests under it (PetstoreAPI -> petstoreapi,\n",
+                "  petstoreapi.api, petstoreapi.adapter). Never create a bare \"api\"/\"util\"/\"services\" folder at the\n",
+                "  top level -- it collides with every other package. folder_create makes ONE level per call, parents first.\n",
                 "- NEVER prefix node_nsName with the package name; the package goes ONLY in node_pkg\n",
                 "  (node_nsName is the folder path + service, e.g. orders.api:create, NOT MyPackage.orders.api:create -- prefixing the path with the package causes a 500)\n",
                 "- put_node is the core API for creating/updating flow services with full logic\n",
