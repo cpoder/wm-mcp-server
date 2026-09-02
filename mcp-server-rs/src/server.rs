@@ -1,6 +1,9 @@
 //! MCP server definition with tool methods.
 
-use crate::client::ISClient;
+use crate::client::{
+    ISClient, SESSION_SCOPE_WARNING, SuiteCreateOptions, SuiteMode, TestCaseSpec, junit_markdown,
+    junit_summary, normalize_mock_scope, strip_junit_properties,
+};
 use crate::params::*;
 use rmcp::{
     RoleServer, ServerHandler, handler::server::router::tool::ToolRouter,
@@ -3272,7 +3275,9 @@ impl WmServer {
         }
     }
 
-    #[tool(description = "Check the status of a test execution (RUNNING, COMPLETED, FAILED).")]
+    #[tool(
+        description = "Check the status of a test execution: NEW, INVOKED, INPROGRESS, COMPLETED, ERROR, or UNAVAILABLE (unknown executionID). Reports can be fetched once the status is COMPLETED."
+    )]
     async fn test_check_status(
         &self,
         Parameters(p): Parameters<TestExecutionIdParam>,
@@ -3284,51 +3289,169 @@ impl WmServer {
         }
     }
 
-    #[tool(description = "Get a human-readable text report for a test execution.")]
+    #[tool(
+        description = "Show the report of a test execution in a readable form, built from the JUnit XML: overall verdict and totals, then one table per suite listing every test case with its result (PASS / FAIL / ERROR / SKIP), duration and failure message. format=markdown (default, ready to display) or json (structured: totals, suites[].cases[] with status/message/type/detail). Use it right after test_run; needs status COMPLETED. test_text_report gives the raw text with stack traces, test_junit_report the raw XML for CI."
+    )]
+    async fn test_report(
+        &self,
+        Parameters(p): Parameters<TestReportParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c.test_junit_report(&p.execution_id).await {
+            Ok(xml) => {
+                let summary = junit_summary(&xml);
+                if p.format
+                    .as_deref()
+                    .map(str::trim)
+                    .is_some_and(|f| f.eq_ignore_ascii_case("json"))
+                {
+                    json_result(&summary)
+                } else {
+                    text_result(&junit_markdown(&summary, &p.execution_id))
+                }
+            }
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Get the plain-text JUnit report of a test execution: summary line (Tests run / Failures / Errors), per-test results, failure messages and stack traces.\n\nReturned as raw text (the IS answers text/plain, not JSON). Only available once test_check_status reports COMPLETED; an unknown or still running executionID yields 'Report ... unavailable, or not generated'."
+    )]
     async fn test_text_report(
         &self,
         Parameters(p): Parameters<TestExecutionIdParam>,
     ) -> Result<CallToolResult, ErrorData> {
         let c = self.get_client(&p.instance)?;
         match c.test_text_report(&p.execution_id).await {
-            Ok(v) => json_result(&v),
+            Ok(report) => text_result(&report),
             Err(e) => text_result(&format!("Failed: {e}")),
         }
     }
 
-    #[tool(description = "Get a JUnit XML report for a test execution (for CI/CD integration).")]
+    #[tool(
+        description = "Get the JUnit XML report of a test execution (<testsuites>/<testsuite>/<testcase> with <failure>/<error> elements and the run log in <system-out>), for CI/CD integration.\n\nReturned as raw XML text (the IS answers application/xml, not JSON). The <properties> block of each <testsuite> is removed unless include_properties is true. Only available once test_check_status reports COMPLETED."
+    )]
     async fn test_junit_report(
         &self,
-        Parameters(p): Parameters<TestExecutionIdParam>,
+        Parameters(p): Parameters<TestJunitReportParam>,
     ) -> Result<CallToolResult, ErrorData> {
         let c = self.get_client(&p.instance)?;
         match c.test_junit_report(&p.execution_id).await {
+            Ok(xml) if p.include_properties.unwrap_or(false) => text_result(&xml),
+            Ok(xml) => text_result(&strip_junit_properties(&xml)),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Create a Unit Test Framework test suite inside an IS package -- the same files Designer's 'New webMethods Test Suite' / 'Generate Tests' produce -- so that test_run can execute it and Designer can open it. Full reference: resource wm://docs/unit-test-reference.\n\nWrites resources/test/setup/<suite_name>.xml plus the pipeline files under resources/test/data/<suite_name>/, on the filesystem when the IS packages directory is reachable from this server, otherwise through pub.file:stringToFile (the packages directory must then be listed in the IS extended setting watt.server.file.canWritePaths).\n\n`tests` is a JSON array of test cases, for example:\n[{\"name\":\"greetAlice\",\"service\":\"utfdemo.services:greet\",\"input\":{\"name\":\"Alice\"},\"expected\":{\"greeting\":\"Hello, Alice\"}},\n {\"name\":\"default\",\"service\":\"utfdemo.services:greet\",\"expected_fields\":[{\"path\":\"/greeting\",\"operator\":\"==\",\"value\":\"Hello, World\"}]},\n {\"name\":\"rejectsNegative\",\"service\":\"utfdemo.services:check\",\"input\":{\"amount\":\"-1\"},\"expected_exception\":{\"message\":\"must be greater\"}},\n {\"name\":\"snapshot\",\"service\":\"utfdemo.services:greet\",\"input\":{\"name\":\"Bob\"},\"record\":true},\n {\"name\":\"isolated\",\"service\":\"utfdemo.services:greet\",\"expected_fields\":[{\"path\":\"/greeting\",\"value\":\"MOCKED\"}],\"mocks\":[{\"service\":\"pub.string:concat\",\"pipeline\":{\"value\":\"MOCKED\"}}]}]\n\nEvery test needs one of: expected (JSON pipeline, compared as a subset of the actual output), expected_fields (JXPath assertions; when present only the fields are evaluated and `expected` merely supplies reference values for fields without `value`), expected_exception, or record=true (invokes the service now, without mocks, with `input` and snapshots its declared outputs -- or its failure -- as the expectation). Optional per test: description, enabled, mocks_enabled, comparator_service (a wm.spec:result_comparator implementation), request_method (invoke|post|get). A mock is {service, then exactly one of pipeline (fixed output), alternate_service (+ optional parms) or exception {class, message}, plus optional scope (session|user|server) and lifetime (test|suite)}. Pipelines are JSON objects: use JSON strings for String fields (\"5\", not 5 -- a JSON number becomes a java.lang.Long that a String-typed flow field silently drops; such values are listed under `warnings` in the response).\n\nmode: create (default, fails if the suite exists), overwrite, or append (adds cases to an existing suite, Designer-made ones included). Verify with test_suite_list, then test_run."
+    )]
+    async fn test_suite_create(
+        &self,
+        Parameters(p): Parameters<TestSuiteCreateParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let tests: Vec<TestCaseSpec> = match serde_json::from_str(&p.tests) {
+            Ok(t) => t,
+            Err(e) => {
+                return text_result(&format!(
+                    "Failed: `tests` must be a JSON array of test case objects: {e}"
+                ));
+            }
+        };
+        let mode = match SuiteMode::parse(p.mode.as_deref()) {
+            Ok(m) => m,
+            Err(e) => return text_result(&format!("Failed: {e}")),
+        };
+        let c = self.get_client(&p.instance)?;
+        let opts = SuiteCreateOptions {
+            package: p.package.trim().to_string(),
+            suite_name: p.suite_name.trim().to_string(),
+            description: p.description.clone(),
+            mocks_enabled: p.mocks_enabled.unwrap_or(true),
+            mode,
+        };
+        match c.test_suite_create(opts, tests).await {
             Ok(v) => json_result(&v),
             Err(e) => text_result(&format!("Failed: {e}")),
         }
     }
 
     #[tool(
-        description = "Load a service mock.\n\nReplaces the real service with a mock for testing. Scope: 'session' (current session only) or 'global' (all sessions)."
+        description = "List the Unit Test Framework suites found in the enabled custom packages (wm.task.asset:suites): suite file, test cases, service under test, expectation and mocks of each. Optional `packages` JSON array to filter. Use it to verify what test_suite_create wrote and to see what test_run will execute."
     )]
-    async fn mock_load(
+    async fn test_suite_list(
         &self,
-        Parameters(p): Parameters<MockLoadParam>,
+        Parameters(p): Parameters<TestSuiteListParam>,
     ) -> Result<CallToolResult, ErrorData> {
+        let packages = match parse_optional_json(&p.packages) {
+            Ok(v) => v,
+            Err(e) => return text_result(&e),
+        };
         let c = self.get_client(&p.instance)?;
-        match c.mock_load(&p.scope, &p.service, &p.mock_object).await {
+        match c.test_suite_list(packages.as_ref()).await {
             Ok(v) => json_result(&v),
             Err(e) => text_result(&format!("Failed: {e}")),
         }
     }
 
-    #[tool(description = "Clear a specific service mock.")]
+    #[tool(
+        description = "Read a test suite file or a pipeline file of a package (wm.task.asset:suiteIO). Returns the raw text by default; with as_pipeline=true an IDataXMLCoder pipeline file is decoded into JSON. Paths come from test_suite_list (suitelocation, inputFilename, expectedFilename, pipelineFilename)."
+    )]
+    async fn test_suite_get(
+        &self,
+        Parameters(p): Parameters<TestSuiteGetParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let c = self.get_client(&p.instance)?;
+        match c
+            .test_suite_get(
+                p.package.trim(),
+                p.path.trim(),
+                p.as_pipeline.unwrap_or(false),
+            )
+            .await
+        {
+            Ok(Value::String(text)) => text_result(&text),
+            Ok(v) => json_result(&v),
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Load a service mock: every invocation of `service` is replaced by an invocation of the alternate service `mock_object` (it receives the same pipeline).\n\nScope (default 'server'): 'server' = all users and sessions -- the only scope that reliably survives across MCP calls, because each call opens a new IS session; 'user' = all sessions of the IS user the MCP server authenticates as; 'session' = the IS session of this single call, which is closed on return, so the mock is never applied. 'global' is accepted as an alias of 'server'. Server-scoped mocks affect every caller of the IS: mock_clear / mock_clear_all when done."
+    )]
+    async fn mock_load(
+        &self,
+        Parameters(p): Parameters<MockLoadParam>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let scope = match normalize_mock_scope(p.scope.as_deref()) {
+            Ok(s) => s,
+            Err(e) => return text_result(&format!("Failed: {e}")),
+        };
+        let c = self.get_client(&p.instance)?;
+        match c.mock_load(&scope, &p.service, &p.mock_object).await {
+            Ok(mut v) => {
+                if let Some(o) = v.as_object_mut().filter(|_| scope == "session") {
+                    o.insert("warning".into(), json!(SESSION_SCOPE_WARNING));
+                }
+                json_result(&v)
+            }
+            Err(e) => text_result(&format!("Failed: {e}")),
+        }
+    }
+
+    #[tool(
+        description = "Clear a specific service mock. The scope must be the one the mock was loaded with (default 'server'; 'global' = alias of 'server'): clearing with another scope is a silent no-op on the IS. Use mock_list to see the active mocks per scope."
+    )]
     async fn mock_clear(
         &self,
         Parameters(p): Parameters<MockClearParam>,
     ) -> Result<CallToolResult, ErrorData> {
+        let scope = match normalize_mock_scope(p.scope.as_deref()) {
+            Ok(s) => s,
+            Err(e) => return text_result(&format!("Failed: {e}")),
+        };
         let c = self.get_client(&p.instance)?;
-        match c.mock_clear(&p.scope, &p.service).await {
+        match c.mock_clear(&scope, &p.service).await {
             Ok(v) => json_result(&v),
             Err(e) => text_result(&format!("Failed: {e}")),
         }
@@ -5189,7 +5312,7 @@ impl ServerHandler for WmServer {
                 "MARKETPLACE: Use marketplace_search/install to find and install packages from packages.webmethods.io.\n",
                 "JAR INSTALLER: Use install_jars to download JARs from Maven Central and install into IS.\n",
                 "FLOW DEBUGGING: Use flow_debug_start/execute/close to step through services.\n",
-                "UNIT TESTING: Use test_run to execute test suites, mock_load to mock services.\n",
+                "UNIT TESTING: Read 'wm://docs/unit-test-reference' first. test_suite_create writes a Unit Test Framework suite (Designer-compatible XML + pipeline files) into a package, test_suite_list shows what exists, test_run executes it, then test_report (readable per-case table), test_text_report / test_junit_report (raw text/XML). mock_load mocks a service for the whole IS (scope 'server'); mock_clear_all afterwards.\n",
             ))
     }
 

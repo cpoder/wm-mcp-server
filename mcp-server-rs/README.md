@@ -34,7 +34,7 @@ Set `WM_CONFIG=/path/to/config.json`:
 }
 ```
 
-## Tools Reference (339 tools)
+## Tools Reference (343 tools)
 
 ### Server & Instances (3)
 `list_instances`, `is_status`, `is_shutdown`
@@ -51,8 +51,10 @@ Set `WM_CONFIG=/path/to/config.json`:
 ### Flow Debugging (7)
 `flow_debug_start`, `flow_debug_execute` (stepOver/stepIn/stepOut/resume/stop), `flow_debug_close`, `flow_debug_insert_breakpoints`, `flow_debug_remove_all_breakpoints`, `flow_debug_set_pipeline`, `flow_debug_stop_service`
 
-### Unit Testing & Mocking (10)
-`test_run`, `test_check_status`, `test_text_report`, `test_junit_report`, `mock_load`, `mock_clear`, `mock_clear_all`, `mock_list`, `mock_suspend`, `mock_resume`
+### Unit Testing & Mocking (14)
+`test_suite_create`, `test_suite_list`, `test_suite_get`, `test_run`, `test_check_status`, `test_report`, `test_text_report`, `test_junit_report`, `mock_load`, `mock_clear`, `mock_clear_all`, `mock_list`, `mock_suspend`, `mock_resume`
+
+Authors and runs Unit Test Framework suites (ex-WmTestSuite) through the `WmUnitTestManager` package. `test_suite_create` writes the same files Designer's plugin produces -- `resources/test/setup/<suite>.xml` plus IDataXMLCoder pipeline files under `resources/test/data/<suite>/` -- from a JSON description of the test cases (input/expected pipelines, JXPath field assertions, expected exceptions, mocks by pipeline / alternate service / exception, `record` mode that snapshots a live invocation like Designer's "Generate Tests"); Designer opens the result and `mode=append` adds cases to Designer-made suites. Files go to the filesystem when the IS packages directory is reachable, otherwise through `pub.file:stringToFile` (needs the directory in `watt.server.file.canWritePaths`). Reference: resource `wm://docs/unit-test-reference`. `test_text_report` / `test_junit_report` return the reports as raw text / JUnit XML (the `<properties>` block is stripped unless `include_properties` is true). Mock scopes are `server` (default, the only one that persists across MCP calls since every call is a new IS session), `user` and `session`; `global` is accepted as an alias of `server`.
 
 ### Document Type Generation (5 + 2 SAP)
 `doctype_gen_from_json`, `doctype_gen_from_json_schema`, `doctype_gen_from_xsd`, `doctype_gen_from_xml`, `doctype_gen_from_dtd`, `sap_idoc_doctype_create`, `sap_rfc_doctype_create`
@@ -203,4 +205,4 @@ Set `WM_CONFIG=/path/to/config.json`:
 | SAP doc type gen | Active SAP connection required |
 | OPC UA adapters | OPC UA JARs installed |
 | Marketplace install | MCP server needs filesystem access to IS packages directory |
-| Unit testing | `WmUnitTestManager` package installed and enabled |
+| Unit testing | `WmUnitTestManager` package installed and enabled, plus the Unit Test Framework client JARs in `<IS_HOME>/common/lib/testsuite/` (installed with Designer; on a Linux-only IS copy the 9 JARs from a Designer installation, otherwise `test_run` fails with `common/lib/testsuite does not exist` and field assertions with `NoClassDefFoundError com.wm.ps.jxpath`) |

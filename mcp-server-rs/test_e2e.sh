@@ -627,6 +627,19 @@ fi
 
 # ── Unit Testing (full lifecycle) ─────────────────────────────
 echo "--- Unit Testing ---"
+# Author a Designer-compatible suite for e2etest.services:hello inside the package
+# (record=true snapshots the live output; the second case asserts a field)
+SUITE_TESTS='[{"name":"helloRecorded","service":"e2etest.services:hello","input":{"name":"E2E"},"record":true},{"name":"helloField","service":"e2etest.services:hello","expected_fields":[{"path":"/greeting","operator":"==","value":"Hello from E2E test!"}]}]'
+SUITE_ARGS=$(python3 -c 'import json,sys; print(json.dumps({"package":"E2ETestPkg","suite_name":"E2ESuite","tests":sys.argv[1],"mode":"overwrite"}))' "$SUITE_TESTS")
+out=$(mcp_call 2 "test_suite_create" "$SUITE_ARGS")
+check "test_suite_create" "$out" "resources/test/setup/E2ESuite.xml"
+
+out=$(mcp_call 2 "test_suite_list" '{"packages":"[\"E2ETestPkg\"]"}')
+check "test_suite_list" "$out" "E2ESuite"
+
+out=$(mcp_call 2 "test_suite_get" '{"package":"E2ETestPkg","path":"resources/test/setup/E2ESuite.xml"}')
+check "test_suite_get" "$out" "webMethodsTestSuite"
+
 # Test run via curl (needs more time than mcp_call's 1s timeout)
 EXEC_RESULT=$(curl -s -u Administrator:manage -H "Accept: application/json" \
   -X POST 'http://localhost:5555/invoke/wm.task.executor:run' \
@@ -638,6 +651,13 @@ if [ -n "$EXEC_ID" ]; then
   PASS=$((PASS + 1))
   out=$(mcp_call 2 "test_check_status" "{\"execution_id\":\"$EXEC_ID\"}")
   check "test_check_status" "$out" "COMPLETED\|status"
+  # Reports are raw text / XML (the IS does not answer JSON here)
+  out=$(mcp_call 2 "test_text_report" "{\"execution_id\":\"$EXEC_ID\"}")
+  check "test_text_report" "$out" "Tests run:"
+  out=$(mcp_call 2 "test_junit_report" "{\"execution_id\":\"$EXEC_ID\"}")
+  check "test_junit_report" "$out" "<testsuite"
+  out=$(mcp_call 2 "test_report" "{\"execution_id\":\"$EXEC_ID\"}")
+  check "test_report" "$out" "# Test report"
 else
   echo "  FAIL: test_run (no executionID)"
   FAIL=$((FAIL + 1))
@@ -647,8 +667,12 @@ fi
 out=$(mcp_call 2 "mock_list" '{}')
 check "mock_list" "$out" "mockedServices"
 
-out=$(mcp_call 2 "mock_load" '{"scope":"session","service":"pub.math:addInts","mock_object":"pub.flow:debugLog"}')
-check "mock_load" "$out" "pub.math:addInts\|scope"
+# scope must be server (or user): every MCP call is a new IS session, so a session mock is lost immediately
+out=$(mcp_call 2 "mock_load" '{"scope":"server","service":"pub.math:addInts","mock_object":"pub.flow:debugLog"}')
+check "mock_load" "$out" "\"scope\": \"server\""
+
+out=$(mcp_call 2 "mock_clear" '{"scope":"server","service":"pub.math:addInts"}')
+check "mock_clear" "$out" "pub.math:addInts"
 
 out=$(mcp_call 2 "mock_clear_all" '{}')
 check_not_empty "mock_clear_all" "$out"

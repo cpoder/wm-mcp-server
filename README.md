@@ -17,7 +17,7 @@ Compatible with any MCP client: [IBM Bob](https://www.ibm.com/products/bob), [Cl
 | **Flow services** | Create services with full logic (INVOKE, MAP, BRANCH, LOOP, TRY/CATCH), signatures, test them | 5 |
 | **FSL generation** | Validate, compile/deploy, and decompile flow services from Flow Service Language (FSL) source text | 3 |
 | **Flow debugging** | Step-by-step execution, inspect pipeline at each step, set breakpoints, modify variables | 7 |
-| **Unit testing** | Run test suites, get JUnit/text reports, mock services for isolated testing | 10 |
+| **Unit testing** | Author Designer-compatible test suites (pipelines, field assertions, mocks, recorded snapshots), run them, show readable / JUnit / text reports, mock services | 14 |
 | **Namespace dependencies** | Find dependents, references, unresolved refs, search nodes, refactor/rename | 6 |
 | **Adapter services** | Browse database tables/columns interactively, create Select/Insert/CustomSQL services -- like Designer | 5 |
 | **JDBC/SAP/OPC adapters** | Create connections, listeners, notifications, query metadata | 20 |
@@ -57,7 +57,7 @@ Compatible with any MCP client: [IBM Bob](https://www.ibm.com/products/bob), [Cl
 | **IP access** | Global IP allow/deny rules | 4 |
 | **WebSocket** | Session management, endpoint creation, broadcast | 4 |
 
-**339 tools + 9 interactive prompts + 8 RAG resources** in total. **184 end-to-end tests** validated against a live IS with real infrastructure (Mosquitto MQTT broker, ActiveMQ JMS, MySQL).
+**343 tools + 9 interactive prompts + 9 RAG resources** in total. **184 end-to-end tests** validated against a live IS with real infrastructure (Mosquitto MQTT broker, ActiveMQ JMS, MySQL).
 
 ### Interactive setup wizards (prompts)
 
@@ -197,7 +197,7 @@ AI Assistant ──MCP (stdio/HTTP)──> wm-mcp-server (Rust) ──HTTP/JSON�
 
 All operations use IS built-in HTTP services. No filesystem access needed for most operations (marketplace install requires local access to the IS packages directory).
 
-Flow services are created via `wm.server.ns/putNode` which accepts the full flow tree as JSON -- the same `FlowElement` / `Values` serialization used internally by the IS runtime. The server includes 8 embedded RAG resources: comprehensive flow language documentation, 15 working putNode examples (including TRY/CATCH, LOOP, BRANCH, MAPINVOKE, transactions), adapter connection and adapter service configuration guides, an FSL language reference, and on-prem provisioning / database setup notes.
+Flow services are created via `wm.server.ns/putNode` which accepts the full flow tree as JSON -- the same `FlowElement` / `Values` serialization used internally by the IS runtime. The server includes 9 embedded RAG resources: comprehensive flow language documentation, 15 working putNode examples (including TRY/CATCH, LOOP, BRANCH, MAPINVOKE, transactions), adapter connection and adapter service configuration guides, an FSL language reference, a Unit Test Framework reference (suite authoring, mocks, reports), and on-prem provisioning / database setup notes.
 
 ### Transport modes
 

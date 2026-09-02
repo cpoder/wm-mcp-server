@@ -34,7 +34,13 @@ mod security;
 mod services;
 mod sftp;
 mod streaming;
+mod test_suites;
 mod testing;
+pub use test_suites::{SuiteCreateOptions, SuiteMode, TestCaseSpec};
+pub use testing::{
+    SESSION_SCOPE_WARNING, junit_markdown, junit_summary, normalize_mock_scope,
+    strip_junit_properties,
+};
 mod triggers;
 mod users;
 mod webservices;
@@ -123,6 +129,26 @@ impl ISClient {
         } else {
             serde_json::from_str(&text).map_err(|e| e.to_string())
         }
+    }
+
+    /// POST to an IS service whose successful response is NOT JSON -- for
+    /// example the WmUnitTestManager report services, which write the
+    /// report through `responseString` + `HTTPServerUtil.setResponse2` as
+    /// `application/xml` / `text/plain`. Errors still arrive as JSON and are
+    /// surfaced by `read_checked`; the body is returned verbatim otherwise.
+    pub(crate) async fn invoke_post_text(
+        &self,
+        service: &str,
+        payload: &Value,
+    ) -> Result<String, String> {
+        let r = self
+            .client
+            .post(self.url(&format!("/invoke/{service}")))
+            .json(payload)
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+        read_checked(r).await
     }
 }
 
