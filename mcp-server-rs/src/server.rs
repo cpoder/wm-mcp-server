@@ -836,7 +836,7 @@ impl WmServer {
     }
 
     #[tool(
-        description = "Update an existing adapter service's configuration (connection, settings)."
+        description = "Update an existing adapter service's configuration (connection, settings). The node is locked for edit around the update (Designer semantics) and unlocked afterwards. Send the COMPLETE adapterServiceSettings (fetch them with adapter_service_get, then modify): the update replaces the template properties. int/boolean properties such as select.maxRow, select.queryTimeOut and select.autoDelete must be JSON STRINGS (\"0\", \"-1\", \"false\"); a JSON number arrives as a Long and is rejected with [ART.114.238]. JDBC Select services need select.sortOrder (one \"\" per select.expression), otherwise every invocation fails with 'this.sortOrder is null'. Where-clause layout: resource wm://docs/adapter-service-reference."
     )]
     async fn adapter_service_update(
         &self,

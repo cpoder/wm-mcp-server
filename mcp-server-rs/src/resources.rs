@@ -288,6 +288,21 @@ All field references in flow services use WmPath format: `/fieldName;type;dim[;d
 - `/accounts;4;1;mypackage.doctypes:account` -- typed record array (RecordRef to doc type)
 - `/accounts;4;0;mypackage.doctypes:account/customerName;1;0` -- field inside current LOOP iteration element
 
+### Indexed access into a list (`results[0]`)
+
+A record list or string list element is addressed with the index right after
+the field name, BEFORE the `;type;dim` suffix, and the dim stays the list's:
+
+```
+/selectPetOutput;2;0/results[0];2;1/name;1;0     -> name of the first row
+/ICValues;2;0/UNB;2;0/UNG[0];2;1/UNG06;1;0        -> Designer-generated example
+```
+
+`results;2;0` (dim 0) does NOT mean "first element": it reads the list as if
+it were a single record and silently yields nothing. Typical JDBC pattern:
+INVOKE the Select, `pub.list:sizeOfList` on `results`, BRANCH on `size`
+(`0` -> EXIT $parent FAILURE into the CATCH), else MAPCOPY from `results[0]`.
+
 ## Flow Step Types
 
 ### INVOKE
@@ -1633,6 +1648,72 @@ const ADAPTER_SERVICE_REF: &str = r#"# Adapter Service Configuration Reference
 }
 ```
 Note: Exclude identity/auto-increment columns from Insert update.* arrays.
+
+### Select: properties that are easy to miss (verified on IS 12.1, JDBC Adapter 10.3, PostgreSQL)
+- `select.sortOrder` is REQUIRED: one entry per `select.expression`, `""` for
+  no ORDER BY (`"Ascend"` / `"Descend"` otherwise). A Select created without it
+  fails on EVERY invocation with `[ART.114.505] ... Cannot load from object
+  array because "this.sortOrder" is null` -- the node looks fine in Designer
+  and in adapter_service_get, only the runtime breaks.
+- int / boolean properties (`select.maxRow`, `select.queryTimeOut`,
+  `select.autoDelete`) travel as JSON STRINGS (`"0"`, `"-1"`, `"false"`): a
+  JSON number becomes a java.lang.Long and the metadata layer rejects it with
+  `[ART.114.238] Value for parameter select.maxRow does not match data type int`.
+- `tables.columnInfo` and `tables.realSchemaName` only feed Designer's
+  resource-domain lookups; the runtime does not need them.
+- Output shape: `<out>/results` is a RECORD LIST (`results;2;1`) even for a
+  single row. A flow must read `results[0]` --
+  `/selectPetOutput;2;0/results[0];2;1/name;1;0` -- and test the empty case
+  (`pub.list:sizeOfList` on `results`, BRANCH on `size` = `0`). Reading
+  `results;2;0` as a single record silently yields nulls.
+
+### Select with a WHERE clause (input parameters)
+`WHERE T1.id = ?` bound to an input field `id` of the `<in>` record
+(`selectPetInput/id`), verified end to end:
+```json
+{
+  "...": "the select.* / tables.* settings above, plus",
+  "where.andOr": [""],
+  "where.leftParen": [""],
+  "where.leftExpr": ["T1.id"],
+  "where.operator": ["="],
+  "where.rightExpr": ["?"],
+  "where.rightParen": [""],
+  "where.hiddenJDBCType": ["BIGINT"],
+  "where.hiddenInputType": ["java.lang.String"],
+  "where.hiddenInputField": ["id"],
+  "where.parameter": ["T1.id"],
+  "where.inputFieldName": ["T1.id"],
+  "where.hiddenInputFieldName": ["id"],
+  "where.JDBCType": ["BIGINT"],
+  "where.inputType": ["java.lang.String"],
+  "where.inputField": ["id"]
+}
+```
+- One row per condition across `where.andOr` / `leftParen` / `leftExpr` /
+  `operator` / `rightExpr` / `rightParen`; they are concatenated in that order
+  to build the SQL text (empty strings are skipped). First `andOr` is `""`,
+  the next rows use `AND`, `OR`, `AND NOT`, `OR NOT`. Operators: `=`, `<>`,
+  `<`, `>`, `<=`, `>=`, `LIKE`, `IS`, `IS NOT`. `rightExpr` is `?` for a bound
+  parameter, or a literal SQL expression.
+- Each `?` consumes, in order, one entry of `where.inputField` (name of the
+  field in the input record), `where.inputType` (Java type) and
+  `where.JDBCType`; that triple is what binds the prepared statement and
+  what generates the input signature. The `hidden*`, `parameter` and
+  `inputFieldName` arrays are Designer bookkeeping: keep them consistent
+  (`parameter` and `inputFieldName` = the column expression,
+  `hiddenInputFieldName` / `hiddenInputField` = the column name).
+- Valid values come from adapter_resource_domain_lookup on the Select
+  template: `andOr`, `operator`, `leftParen`, `rightParen`,
+  `defaultExpression` (`?`), `sortModes`, `columnInfo(catalog, schema, table)`.
+
+### Updating an existing adapter service
+`adapter_service_update` locks the node (`wm.server.ns:lockNode`), calls
+`wm.art.dev.service:updateAdapterServiceNode` and unlocks it; without the
+lock the IS answers `[ART.117.4050] ... needs to be checked out or lock for
+edit`. Send the complete settings (adapter_service_get, edit, send back).
+Verify with service_invoke: `{"selectPetInput": {"id": "1"}}` must return
+`selectPetOutput.results` (possibly empty), not an ART error.
 "#;
 
 const FLOW_STEPS_REF: &str = r#"# webMethods Flow Steps Reference

@@ -329,6 +329,27 @@ impl super::ISClient {
         .await
     }
 
+    /// Lock a namespace node for edit, as Designer does before saving it.
+    /// `updateAdapterServiceNode` refuses to run on an unlocked node:
+    /// `[ART.117.4050] ... needs to be checked out or lock for edit`.
+    pub async fn lock_node(&self, node_ns_name: &str) -> Result<Value, String> {
+        self.invoke_post(
+            "wm.server.ns:lockNode",
+            &json!({"node_nsName": node_ns_name}),
+        )
+        .await
+    }
+
+    pub async fn unlock_node(&self, node_ns_name: &str) -> Result<Value, String> {
+        self.invoke_post(
+            "wm.server.ns:unLockNode",
+            &json!({"node_nsName": node_ns_name}),
+        )
+        .await
+    }
+
+    /// Update an adapter service: lock, `updateAdapterServiceNode`, unlock
+    /// (the unlock always runs, the update result is reported afterwards).
     pub async fn adapter_service_update(
         &self,
         service_name: &str,
@@ -343,7 +364,20 @@ impl super::ISClient {
                     .insert(k.clone(), v.clone());
             }
         }
-        self.invoke_post("wm.art.dev.service:updateAdapterServiceNode", &payload)
+        self.lock_node(service_name)
             .await
+            .map_err(|e| format!("cannot lock {service_name} for edit: {e}"))?;
+        let result = self
+            .invoke_post("wm.art.dev.service:updateAdapterServiceNode", &payload)
+            .await;
+        let unlock = self.unlock_node(service_name).await;
+        let mut v = result?;
+        if let (Err(e), Some(o)) = (unlock, v.as_object_mut()) {
+            o.insert(
+                "warning".into(),
+                json!(format!("updated, but the node could not be unlocked: {e}")),
+            );
+        }
+        Ok(v)
     }
 }
