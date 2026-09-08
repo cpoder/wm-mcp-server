@@ -34,7 +34,7 @@ Set `WM_CONFIG=/path/to/config.json`:
 }
 ```
 
-## Tools Reference (343 tools)
+## Tools Reference (345 tools)
 
 ### Server & Instances (3)
 `list_instances`, `is_status`, `is_shutdown`
@@ -77,8 +77,8 @@ Authors and runs Unit Test Framework suites (ex-WmTestSuite) through the `WmUnit
 ### Adapter Connections (7)
 `adapter_type_list`, `adapter_connection_list`, `adapter_connection_create`, `adapter_connection_enable`, `adapter_connection_disable`, `adapter_connection_metadata`, `adapter_connection_state`
 
-### Adapter Services & Metadata (8)
-`adapter_service_create`, `adapter_service_get`, `adapter_service_update`, `adapter_service_template_list`, `adapter_service_template_metadata`, `adapter_resource_domain_lookup`, `adapter_listener_list`, `adapter_listener_create`, `adapter_listener_enable`, `adapter_listener_disable`
+### Adapter Services & Metadata (10)
+`adapter_service_create`, `jdbc_custom_sql_create`, `jdbc_batch_insert_create`, `adapter_service_get`, `adapter_service_update`, `adapter_service_template_list`, `adapter_service_template_metadata`, `adapter_resource_domain_lookup`, `adapter_listener_list`, `adapter_listener_create`, `adapter_listener_enable`, `adapter_listener_disable`
 
 ### Adapter Notifications (3)
 `adapter_notification_list`, `adapter_notification_create_polling`, `adapter_notification_create_listener_based`

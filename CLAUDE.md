@@ -26,9 +26,20 @@ sers-t'en de modèle.
 - `flow_service_create` (et `service_create`) ne crée qu'une **coquille vide**
   (aucune signature, aucune logique). Ce n'est PAS suffisant.
 - Le vrai outil est **`put_node`** (API IS `putNode`) : il crée/met à jour le
-  service complet (signature `sig_in`/`sig_out` + arbre `flow`). Tu peux
-  d'ailleurs créer directement le service final en un seul `put_node`, sans
-  passer par `flow_service_create`.
+  service complet (signature `sig_in`/`sig_out` + arbre `flow`). Un seul
+  `put_node` suffit : **l'outil crée lui-même la coquille** quand le nœud
+  n'existe pas (`serviceAdd` pour un flow, `makeNode` pour un doc type), parce
+  que sur IS 12.1 (`watt.server.ns.lockingMode=full`) `putNode` verrouille le
+  nœud avant d'écrire et échoue sinon avec `[ISS.0081.9001] Node ... does not
+  exist` à `nsimpl.lockNode`. Les **dossiers** parents, eux, doivent exister.
+- Après l'écriture, `put_node` **relit le nœud et compare le nombre d'étapes
+  par type** avec ce qui a été envoyé (`verification` dans la réponse). Un
+  déficit est une erreur : IS supprime en silence toute étape dont il ne
+  connaît pas le `type` ou les clés (voir RETRY / `evaluate-labels` plus bas).
+  L'arbre est aussi validé AVANT l'envoi : `REPEAT`, `TRY`, `label-expressions`…
+  sont refusés avec la bonne orthographe.
+- `node_get` renvoie le vrai arbre `flow.nodes` (lecture en XML côté IS) : c'est
+  le modèle à copier quand un format est incertain.
 
 ## Ordre des opérations (checklist — respecte-la, c'est ce qui évite les 500)
 
@@ -50,8 +61,10 @@ sers-t'en de modèle.
    (`document_type_create` puis `put_node` pour les champs). Référencer un doc
    type inexistant fait planter le compilateur de flow → 500.
 4. **Service** : `put_node` avec le `node_data` complet (voir règles ci-dessous).
-5. **Vérifie** : `node_get` (le nœud est bien là et complet) puis
-   `service_invoke` avec un jeu d'essai. Ne considère jamais « créé » = « marche ».
+5. **Vérifie** : la réponse de `put_node` contient `verification.status = ok`
+   (comptage des étapes relues) ; puis `service_invoke` avec un jeu d'essai
+   (une erreur revient avec `isError` et un corps structuré `error` /
+   `errorType` / `at` / `cause`). Ne considère jamais « créé » = « marche ».
 
 ## Règles de contenu `put_node` (sources fréquentes de 500)
 
@@ -85,8 +98,17 @@ sers-t'en de modèle.
 - **INVOKE** : mets `validate-in: "$none"` et `validate-out: "$none"` sauf besoin
   contraire. Les mappings INPUT/OUTPUT vont dans des `MAP` mode `INPUT`/`OUTPUT`
   enfants du nœud INVOKE.
-- **TRY/CATCH** : ce sont des SEQUENCE **frères adjacents** ; à l'intérieur du
-  TRY, déclenche le CATCH avec `EXIT from="$parent" signal="FAILURE"`.
+- **TRY/CATCH** : ce sont des SEQUENCE **frères adjacents** (`"form": "TRY"` /
+  `"form": "CATCH"`) ; à l'intérieur du TRY, déclenche le CATCH avec
+  `EXIT from="$parent" signal="FAILURE"`. Les types `TRY`/`CATCH` n'existent pas.
+- **REPEAT = type `RETRY`** : `{"type":"RETRY","count":"3","backoff":"5",
+  "repeat-on":"FAILURE"|"SUCCESS"}` (flow.xml `<RETRY COUNT BACK-OFF LOOP-ON>`).
+  `"type":"REPEAT"`, `repeat-interval`, `back-off` sont ignorés en silence
+  (le nœud ET son sous-arbre disparaissent) ; `put_node` les refuse désormais.
+- **BRANCH sur expressions** : clé **`evaluate-labels: "true"`** (pas
+  `label-expressions`, ignorée → `[ISC.0049.9009] Missing required property
+  switch` à l'exécution) ; pas de `switch` en mode expression ; `EXIT
+  from="$loop"` dans une BRANCH marche dans LOOP comme dans RETRY.
 - **Nettoyage** : après un LOOP, `MAPDELETE` les tableaux temporaires hors de la
   sortie.
 
@@ -104,6 +126,10 @@ exploite-le au lieu de relancer un JSON identique. Correspondances fréquentes :
 | `already exists` | nœud déjà présent | `node_get` pour comparer, ou supprime/mets à jour |
 | `not writable` / package désactivé | package read-only/désactivé | active le package, ou choisis-en un autre |
 | `has dependents` à la suppression | d'autres nœuds référencent celui-ci | `ns_dep_get_dependents` avant `node_delete` |
+| `[ISC.0049.9009] Missing required property switch` à l'exécution | BRANCH écrite avec `label-expressions` (clé ignorée) | utilise `evaluate-labels` |
+| `verification.status = mismatch` dans la réponse `put_node` | étape/clé inconnue d'IS supprimée en silence | lis `missing`, corrige le type/la clé (RETRY, evaluate-labels…) |
+| `[ART.117.4030] Unable to create adapter service` (server.log) après un 200 | propriété du mauvais type Java (tableau vide → `Object[]`, nombre JSON) | omets les tableaux vides, chaînes pour int/boolean ; `adapter_service_create` vérifie maintenant l'existence |
+| `[ART.114.243] ... "original" is null` sur un lookup `updateColumnNames` | dépendance `*tables.columnInfo` passée en chaîne brute | `values: [["<columnInfo>"]]` (tableau imbriqué) |
 
 ## Connexions adaptateur JDBC (≠ pools JDBC)
 
@@ -137,6 +163,22 @@ Séquence obligatoire — détails dans `wm://docs/adapter-connection-reference`
 5. `adapter_connection_state` → `connectionState: enabled`, `hasError: false`,
    puis `adapter_resource_domain_lookup` (`catalogNames`) pour prouver que la
    base répond.
+
+## Services adaptateur JDBC : passe par les outils de haut niveau
+
+- **CustomSQL** → `jdbc_custom_sql_create(service_name, package_name,
+  connection_alias, sql, inputs=[{name, jdbc_type}], outputs=[…]?,
+  result_row_field?)` ; **BatchInsert** → `jdbc_batch_insert_create(…, schema,
+  table, exclude_columns=[clés serial])`. Ils construisent les ~30 propriétés
+  du template, créent le nœud et **vérifient qu'il existe** (l'ART refuse des
+  nœuds en silence, HTTP 200 quand même).
+- Avec `adapter_service_create` brut : jamais de tableau JSON vide, entiers et
+  booléens en chaînes, longueurs de tableaux cohérentes ; `customSQLcolInfo`
+  renvoie `-1` dès qu'il y a jointure/sous-requête/fonction → fournis les
+  colonnes toi-même. Détails : `wm://docs/adapter-service-reference`.
+- FSL (`fsl_deploy`) : à réserver aux services sans listes de documents ni
+  boucles ni `pub.date` — le compilateur IS 12.1 supprime les copies de
+  recordList et le corps des WHILE sans erreur. Sinon `put_node`.
 
 ## Suppression sûre
 

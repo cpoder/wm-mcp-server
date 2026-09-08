@@ -93,7 +93,9 @@ pub struct AdapterServiceCreateParam {
         description = "Full template class name (e.g., \"com.wm.adapter.wmjdbc.services.CustomSQL\")"
     )]
     pub service_template: String,
-    #[schemars(description = "JSON string of service-specific settings")]
+    #[schemars(
+        description = "JSON string of the template properties (adapterServiceSettings). Rules that avoid a silent refusal by the Adapter Runtime: int/boolean properties are JSON STRINGS (\"0\", \"-1\", \"false\"); empty arrays are removed automatically (a JSON [] arrives as Object[] and kills the node); the node's existence is verified after the call and the server.log lines are returned when the ART refused it. For JDBC CustomSQL / BatchInsert prefer jdbc_custom_sql_create / jdbc_batch_insert_create, which build these settings."
+    )]
     pub adapter_service_settings: Option<String>,
     #[schemars(description = "Target IS instance name (omit for default)")]
     pub instance: Option<String>,
@@ -162,7 +164,7 @@ pub struct AdapterResourceDomainLookupParam {
     )]
     pub resource_domain_name: String,
     #[schemars(
-        description = "Dependent parameter values as a JSON array of strings. E.g., for tableNames: [\"catalogName\",\"schemaName\"]. For columnInfo: [\"catalog\",\"schema\",\"table\"]. Omit for top-level domains like catalogNames."
+        description = "Dependent parameter values as a JSON array, one entry per dependency of the domain, in order. Scalars are strings: tableNames -> [\"catalog\",\"schema\"], columnInfo -> [\"catalog\",\"schema\",\"table\"]. An ARRAY-valued dependency (the *-prefixed kind, e.g. updateColumnNames / updateColumnTypes / updateJDBCTypes depend on *tables.columnInfo) is passed as a nested JSON array: [[\"<columnInfo string>\"]] -- the server encodes it the way the ART expects (elements escaped and newline-joined). Omit for top-level domains like catalogNames."
     )]
     pub values: Option<String>,
     #[schemars(description = "Target IS instance name (omit for default)")]
@@ -185,6 +187,68 @@ pub struct AdapterServiceUpdateParam {
         description = "JSON string of settings to update (connectionAlias, adapterServiceSettings)"
     )]
     pub settings: String,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct JdbcCustomSqlCreateParam {
+    #[schemars(description = "Full service name, e.g. \"winfarm.adapters:selectFactChunk\"")]
+    pub service_name: String,
+    #[schemars(description = "Package that owns the service")]
+    pub package_name: String,
+    #[schemars(description = "JDBC adapter connection alias, e.g. \"winfarm.connections:dwh\"")]
+    pub connection_alias: String,
+    #[schemars(
+        description = "SQL statement with ? bind markers (SELECT, INSERT, UPDATE, DELETE, function call ...). Vendor syntax is fine: the adapter only needs the column list, which it either parses itself or takes from `outputs`."
+    )]
+    pub sql: String,
+    #[schemars(
+        description = "JSON array of the bind parameters IN ORDER, one per ?: [{\"name\":\"from_id\",\"jdbc_type\":\"BIGINT\"}, ...]. `name` becomes a field of <service>Input; `jdbc_type` is the JDBC type name (BIGINT, INTEGER, VARCHAR, NUMERIC, TIMESTAMP, DATE, BOOLEAN ...), taken from the adapter's SQL analysis when omitted; `java_type` defaults to java.lang.String, which works for every JDBC type. Required when the SQL contains ?."
+    )]
+    pub inputs: Option<String>,
+    #[schemars(
+        description = "JSON array of the result columns [{\"name\":\"order_id\",\"jdbc_type\":\"VARCHAR\"}, ...] -> <service>Output/results[]/<name>. Omit to let the adapter analyse the SQL (customSQLcolInfo); that analysis returns -1 for joins with aliases, subqueries, functions or ||, in which case this list is required."
+    )]
+    pub outputs: Option<String>,
+    #[schemars(
+        description = "Name of an extra output field receiving the affected-row count (useful for INSERT/UPDATE/DELETE), e.g. \"rowCount\"."
+    )]
+    pub result_row_field: Option<String>,
+    #[schemars(description = "Maximum rows returned (\"0\" = unlimited, default)")]
+    pub max_row: Option<String>,
+    #[schemars(description = "Query timeout in seconds (\"-1\" = driver default)")]
+    pub query_timeout: Option<String>,
+    #[schemars(description = "Target IS instance name (omit for default)")]
+    pub instance: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct JdbcBatchInsertCreateParam {
+    #[schemars(description = "Full service name, e.g. \"winfarm.adapters:insertCustomers\"")]
+    pub service_name: String,
+    #[schemars(description = "Package that owns the service")]
+    pub package_name: String,
+    #[schemars(description = "JDBC adapter connection alias")]
+    pub connection_alias: String,
+    #[schemars(
+        description = "Catalog (database) name; omit to use the first catalog the connection reports (PostgreSQL: the database name)."
+    )]
+    pub catalog: Option<String>,
+    #[schemars(description = "Schema name, e.g. \"dwh\"")]
+    pub schema: String,
+    #[schemars(description = "Table name, e.g. \"dim_customer\"")]
+    pub table: String,
+    #[schemars(
+        description = "JSON array of column names NOT to insert (serial/identity keys, defaulted timestamps), e.g. [\"customer_key\"]"
+    )]
+    pub exclude_columns: Option<String>,
+    #[schemars(
+        description = "JSON array restricting the insert to these columns (default: every column not excluded)"
+    )]
+    pub include_columns: Option<String>,
+    #[schemars(description = "Query timeout in seconds (\"-1\" = driver default)")]
+    pub query_timeout: Option<String>,
     #[schemars(description = "Target IS instance name (omit for default)")]
     pub instance: Option<String>,
 }

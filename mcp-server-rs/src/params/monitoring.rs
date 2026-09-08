@@ -13,7 +13,9 @@ pub struct ServiceStatsParam {
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct ServerLogParam {
-    #[schemars(description = "Number of lines to return from the end of the log")]
+    #[schemars(
+        description = "Number of entries to return from the end of server.log (default 200), oldest first"
+    )]
     pub num_lines: Option<String>,
     #[schemars(description = "Target IS instance name (omit for default)")]
     pub instance: Option<String>,

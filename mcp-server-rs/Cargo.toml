@@ -2,7 +2,7 @@
 name = "wm-mcp-server"
 version = "2.11.1"
 edition = "2024"
-description = "MCP server for webMethods Integration Server — 339 tools replacing Designer for development and administration"
+description = "MCP server for webMethods Integration Server — 345 tools replacing Designer for development and administration"
 license = "MIT"
 repository = "https://github.com/cpoder/wm-mcp-server"
 keywords = ["mcp", "webmethods", "integration-server"]
@@ -26,6 +26,7 @@ schemars = "1.0"
 base64 = "0.22"
 urlencoding = "2.1"
 zip = { version = "2", default-features = false, features = ["deflate"] }
+quick-xml = "0.42"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 anyhow = "1.0"

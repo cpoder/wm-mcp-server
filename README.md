@@ -57,7 +57,7 @@ Compatible with any MCP client: [IBM Bob](https://www.ibm.com/products/bob), [Cl
 | **IP access** | Global IP allow/deny rules | 4 |
 | **WebSocket** | Session management, endpoint creation, broadcast | 4 |
 
-**343 tools + 9 interactive prompts + 9 RAG resources** in total. **184 end-to-end tests** validated against a live IS with real infrastructure (Mosquitto MQTT broker, ActiveMQ JMS, MySQL).
+**345 tools + 9 interactive prompts + 9 RAG resources** in total. **184 end-to-end tests** validated against a live IS with real infrastructure (Mosquitto MQTT broker, ActiveMQ JMS, MySQL).
 
 ### Interactive setup wizards (prompts)
 
