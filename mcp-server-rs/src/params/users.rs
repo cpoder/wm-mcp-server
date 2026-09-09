@@ -71,8 +71,16 @@ pub struct AclNameParam {
 pub struct AclAssignParam {
     #[schemars(description = "Fully qualified node name (e.g., \"mypkg.services:myService\")")]
     pub node_name: String,
-    #[schemars(description = "ACL name to assign")]
+    #[schemars(
+        description = "EXECUTE ACL to assign (an existing ACL name from acl_list, e.g. \"Anonymous\", \"Default\", \"Administrators\")"
+    )]
     pub acl_name: String,
+    #[schemars(description = "Optional LIST (browse) ACL for the node")]
+    pub browse_acl: Option<String>,
+    #[schemars(description = "Optional READ ACL for the node")]
+    pub read_acl: Option<String>,
+    #[schemars(description = "Optional WRITE ACL for the node")]
+    pub write_acl: Option<String>,
     #[schemars(description = "Target IS instance name (omit for default)")]
     pub instance: Option<String>,
 }

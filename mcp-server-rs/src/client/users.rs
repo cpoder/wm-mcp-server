@@ -82,18 +82,104 @@ impl super::ISClient {
 
     // ── ACL Extended ─────────────────────────────────────────────
 
-    pub async fn acl_assign(&self, node_name: &str, acl_name: &str) -> Result<Value, String> {
-        self.invoke_post(
-            "wm.server.access:aclAssign",
-            &json!({"nodeName": node_name, "aclName": acl_name}),
-        )
-        .await
+    /// `wm.server.access:aclAssign(target, acl?, browseaclgroup?, readaclgroup?,
+    /// writeaclgroup?)` -- `acl` is the EXECUTE ACL. The service answers
+    /// HTTP 200 whatever happens and only its `message` tells the truth
+    /// (`Changed permissions for <node>` on success; with the wrong parameter
+    /// names it used to say `Cannot invoke NSName.getFullName() because
+    /// "nsName" is null` and change nothing). The node is read back through
+    /// `getNodeNameListForAcl` to prove the execute ACL took.
+    pub async fn acl_assign(
+        &self,
+        node_name: &str,
+        acl_name: &str,
+        browse_acl: Option<&str>,
+        read_acl: Option<&str>,
+        write_acl: Option<&str>,
+    ) -> Result<Value, String> {
+        // IS stores ANY name as the ACL, existing or not, and the node then
+        // answers 403 to everyone: check the names against aclList first.
+        let known: Vec<String> = self
+            .acl_list()
+            .await?
+            .get("aclgroups")
+            .and_then(Value::as_array)
+            .map(|a| {
+                a.iter()
+                    .filter_map(|g| g.get("name").and_then(Value::as_str))
+                    .map(str::to_string)
+                    .collect()
+            })
+            .unwrap_or_default();
+        for name in [Some(acl_name), browse_acl, read_acl, write_acl]
+            .into_iter()
+            .flatten()
+        {
+            if !name.is_empty() && !known.iter().any(|k| k == name) {
+                return Err(format!(
+                    "ACL \"{name}\" does not exist (IS would store it anyway and lock the node out); existing ACLs: {}",
+                    known.join(", ")
+                ));
+            }
+        }
+        let mut payload = json!({"target": node_name, "acl": acl_name});
+        for (key, value) in [
+            ("browseaclgroup", browse_acl),
+            ("readaclgroup", read_acl),
+            ("writeaclgroup", write_acl),
+        ] {
+            if let Some(v) = value.filter(|v| !v.is_empty()) {
+                payload[key] = json!(v);
+            }
+        }
+        let v = self
+            .invoke_post("wm.server.access:aclAssign", &payload)
+            .await?;
+        let message = v
+            .get("message")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string();
+        if !message.starts_with("Changed permissions") {
+            return Err(format!(
+                "aclAssign did not change {node_name}: IS answered \"{message}\" (does the node exist? is \"{acl_name}\" an existing ACL? see acl_list)"
+            ));
+        }
+        let listed = self
+            .acl_get_nodes_for_acl(acl_name)
+            .await
+            .ok()
+            .and_then(|l| {
+                l.get("nameList")
+                    .and_then(Value::as_array)
+                    .map(|a| a.iter().any(|n| n.as_str() == Some(node_name)))
+            });
+        let mut out = json!({
+            "status": "assigned",
+            "node": node_name,
+            "execute_acl": acl_name,
+            "message": message,
+        });
+        if let Some(b) = browse_acl {
+            out["browse_acl"] = json!(b);
+        }
+        if let Some(r) = read_acl {
+            out["read_acl"] = json!(r);
+        }
+        if let Some(w) = write_acl {
+            out["write_acl"] = json!(w);
+        }
+        if let Some(seen) = listed {
+            out["verified"] = json!(seen);
+        }
+        Ok(out)
     }
 
+    /// `wm.server.access:getNodeNameListForAcl(acl)` -> `nameList`.
     pub async fn acl_get_nodes_for_acl(&self, acl_name: &str) -> Result<Value, String> {
         self.invoke_post(
             "wm.server.access:getNodeNameListForAcl",
-            &json!({"aclName": acl_name}),
+            &json!({"acl": acl_name}),
         )
         .await
     }

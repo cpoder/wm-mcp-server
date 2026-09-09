@@ -426,6 +426,7 @@ Conditional execution based on a field value.
 }
 ```
 Special labels: `$null` (value is null), `$default` (fallback), blank (empty string match).
+Without a `$null` case a null switch value falls into `$default` (verified IS 12.1).
 
 #### BRANCH with label expressions (expression-based branching)
 The key is **`evaluate-labels`** (flow.xml `LABELEXPRESSIONS="true"`). The
@@ -574,6 +575,10 @@ Exit from the current flow, loop, or sequence.
 - `$iteration` -- exit the current LOOP iteration only
 
 `signal` values: `FAILURE` (triggers catch/error), `SUCCESS` (clean exit)
+
+Inside a `SEQUENCE form=TRY`: `EXIT from="$parent" signal="FAILURE"` triggers the adjacent
+CATCH; `EXIT from="$flow"` ends the whole service immediately and BYPASSES the CATCH
+(verified IS 12.1) -- use `$parent` when the CATCH must run (rollback, logging).
 
 EXIT can be a direct child of BRANCH for value-matching:
 ```json
@@ -2528,6 +2533,8 @@ Compares two dates.
 Calculates difference between two dates. Each output is the SAME difference in different units (do NOT add them).
 - **In:** `startDate` (String, req), `endDate` (String, req), `startDatePattern` (String, req), `endDatePattern` (String, req)
 - **Out:** `dateDifferenceSeconds` (String), `dateDifferenceMinutes` (String), `dateDifferenceHours` (String), `dateDifferenceDays` (String) - all truncated to whole numbers
+- The difference is ABSOLUTE (no sign): to know which instant is later, compare the two
+  values formatted as `yyyyMMddHHmmss` strings instead (verified IS 12.1).
 
 ### pub.date:currentNanoTime
 Returns current time in nanoseconds (high-precision timer).
@@ -2709,6 +2716,10 @@ Rolls back a managed adapter transaction.
   `/lastError;4;0;pub.event:exceptionInfo/error;1;0` to a String, then
   `EXIT from="$flow" signal="FAILURE" failure-message="step : %errorMsg%"`
   (`%var%` substitution works in failure-message).
+- `pub.security.outboundPasswords:setPassword` takes a `WmSecureString` for `password`
+  (build it with `pub.security.util:createSecureString` / `convertSecureString`); a plain
+  String is rejected. `getPassword` for an unknown key answers `password = null` with NO
+  error -- BRANCH on `$null` before using it.
 - Invoking a service from a UI: `POST /invoke/<folder>/<svc>` with
   `Content-Type` and `Accept: application/json` + Basic auth; files under
   the package's `pub/` directory are served with the same authentication.
@@ -2723,8 +2734,10 @@ Converts an IData document to a JSON string.
 
 ### pub.json:jsonStringToDocument
 Parses a JSON string into an IData document.
-- **In:** `jsonString` (String, req)
+- **In:** `jsonString` (String, req), `decodeIntegerAsLong` (String, default true), `decodeRealAsDouble` (String, default true)
 - **Out:** `document` (Document - the parsed IData)
+- JSON numbers arrive as `java.lang.Long` / `Double` OBJECTS, not Strings: convert with
+  `pub.string:objectToString` (output `string`) before `pub.math:*` or a String mapping.
 
 ---
 
@@ -2738,8 +2751,15 @@ Invokes a SOAP web service endpoint.
 
 ### pub.client:http
 Sends an HTTP request (GET, POST, PUT, DELETE, etc.).
-- **In:** `url` (String, req), `method` (String - GET/POST/PUT/DELETE), `data` (Object/String/InputStream), `headers` (Document), `auth` (Document - `type`, `user`, `pass`), `encodingType` (String)
-- **Out:** `header` (Document), `body` (Object), `statusCode` (String), `statusMessage` (String)
+- **In:** `url` (String, req), `method` (String - GET/POST/PUT/DELETE), `data` (Document: `string` | `bytes` | `stream` | `args` | `table`), `headers` (Document), `auth` (Document - `type`, `user`, `pass`), `encodingType` (String), `loadAs` (String: `bytes` | `stream` -- there is NO `string` option), `throwExceptionOnHttp401` (String, default true)
+- **Out:** `header` (Document: `lines` (Document of response headers), `status` (String, the HTTP code), `statusMessage`), `body` (Document: `bytes` or `stream`), `encoding`
+- Verified IS 12.1: the HTTP code is `header/status`, NOT a root-level `statusCode`; convert
+  `body/bytes` with `pub.string:bytesToString`; set `throwExceptionOnHttp401` to `false` to
+  handle a 401 yourself (token refresh) instead of catching an exception.
+- IS 12.1 intercepts any INCOMING `Authorization: Bearer` header on `/invoke` and answers
+  `[ISS.0010.8044] token invalid or expired` before the service runs: a flow service cannot
+  host an endpoint protected by its own bearer-token check (use Basic auth, an ACL, or host
+  the simulator outside the IS).
 
 ### pub.client.ftp:login
 Opens FTP connection.

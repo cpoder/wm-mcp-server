@@ -4895,19 +4895,32 @@ impl WmServer {
     // ACL Extended (Tier 2)
     // ═══════════════════════════════════════════════════════════════
 
-    #[tool(description = "Assign an ACL to a namespace node (service, document type, etc).")]
+    #[tool(
+        description = "Assign the EXECUTE ACL of a namespace node (service, document type, folder), optionally its LIST/READ/WRITE ACLs (wm.server.access:aclAssign). The IS answers HTTP 200 even when nothing changed, so the tool checks the IS message (\"Changed permissions for ...\") and reads the node back with getNodeNameListForAcl (`verified`). Typical use: expose a service anonymously -> acl_name \"Anonymous\"; note that IS 12.1 intercepts any incoming Authorization: Bearer header on /invoke ([ISS.0010.8044]) so a service cannot host its own bearer-token check."
+    )]
     async fn acl_assign(
         &self,
         Parameters(p): Parameters<AclAssignParam>,
     ) -> Result<CallToolResult, ErrorData> {
         let c = self.get_client(&p.instance)?;
-        match c.acl_assign(&p.node_name, &p.acl_name).await {
+        match c
+            .acl_assign(
+                &p.node_name,
+                &p.acl_name,
+                p.browse_acl.as_deref(),
+                p.read_acl.as_deref(),
+                p.write_acl.as_deref(),
+            )
+            .await
+        {
             Ok(v) => json_result(&v),
             Err(e) => error_result(&format!("Failed: {e}")),
         }
     }
 
-    #[tool(description = "Get list of nodes that have a specific ACL assigned.")]
+    #[tool(
+        description = "List the namespace nodes whose EXECUTE ACL is the given ACL (wm.server.access:getNodeNameListForAcl) -- the read-back for acl_assign."
+    )]
     async fn acl_get_nodes(
         &self,
         Parameters(p): Parameters<AclNameParam>,
