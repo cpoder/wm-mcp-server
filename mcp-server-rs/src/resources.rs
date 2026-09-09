@@ -698,6 +698,10 @@ Before using RecordRef fields, create the document type:
 5. **INVOKE without INPUT/OUTPUT maps**: The INVOKE nodes array should have MAP mode=INPUT and MAP mode=OUTPUT entries
 6. **Type conversion via intermediary variable (STALE VALUE BUG)**: NEVER create an intermediary variable for type conversion (e.g., long→string). If the source is null/empty, the intermediary retains its previous value from an earlier mapping, producing stale data instead of null. ALWAYS use MAPINVOKE as an inline transformer directly in the MAP step. See correct pattern below.
 7. **No null check before transformation**: When converting types (object→string, long→string, etc.), ALWAYS check for null first. A null value passed to a converter may produce unexpected results or exceptions.
+8. **Whole-record copy then child write in the SAME MAP step**: `MAPCOPY /hdrs;2;0 -> /headers;2;0` followed in the same MAP by a MAPSET/MAPCOPY into `/headers;2;0/Accept;1;0` REPLACES the copied record -- only the child survives. Write the children into the SOURCE record in an earlier MAP, then copy the record alone (verified IS 12.1).
+9. **MAPCOPY then MAPSET overwrite=false on the same target in one MAP step** is unpredictable (sometimes the default wins, sometimes the copy). Use two MAP steps: the copy, then the MAPSET with `overwrite: "false"`.
+10. **Input-map copies stay in the CALLER's pipeline**: variables an INVOKE's INPUT map copies into the called service's inputs remain in the parent pipeline even when the callee drops them at its end. MAPDELETE them in the OUTPUT map of the INVOKE, otherwise secrets (client_secret, tokens) leak into the parent service's output.
+11. **pub.list:appendToDocumentList stores a REFERENCE to `fromItem`**: reusing the same document variable for the next entry overwrites the previous one. MAPDELETE the document after every append (or MAPSET a fresh one).
 
 ### CORRECT: Type conversion with inline MAPINVOKE (no intermediary variable)
 
@@ -2455,7 +2459,7 @@ Binary numeric promotion: Double > Float > Long > Integer.
 ## pub.list (List Folder)
 
 ### pub.list:appendToDocumentList
-Appends documents to a document list. Appends references, not copies.
+Appends documents to a document list. Appends REFERENCES, not copies: MAPDELETE `fromItem` after each call, or the next iteration's writes into the same variable overwrite the entry already in the list (verified IS 12.1).
 - **In:** `toList` (Document List, opt - creates new if absent), `fromList` (Document List, opt), `fromItem` (Document, opt; added after fromList items)
 - **Out:** `toList` (Document List)
 
@@ -2716,6 +2720,11 @@ Rolls back a managed adapter transaction.
   `/lastError;4;0;pub.event:exceptionInfo/error;1;0` to a String, then
   `EXIT from="$flow" signal="FAILURE" failure-message="step : %errorMsg%"`
   (`%var%` substitution works in failure-message).
+- `pub.jwt:generateSignedJWT`: `expirationTime` accepts ONLY the format `dd/MM/yyyy HH:mm:ss`
+  (anything else fails with `[ISS.0163.9015]`); build it with `pub.date:getCurrentDateString` /
+  `incrementDate` using that pattern.
+- `pub.document:documentListToDocument`: `name` and `value` are REQUIRED -- they are the names
+  of the key and value fields inside each list entry (e.g. `name`="key", `value`="val").
 - `pub.security.outboundPasswords:setPassword` takes a `WmSecureString` for `password`
   (build it with `pub.security.util:createSecureString` / `convertSecureString`); a plain
   String is rejected. `getPassword` for an unknown key answers `password = null` with NO
